@@ -1,10 +1,253 @@
-ordinal.scores <- function(mf, method) {
-# This function is called from COBOT.scores().
-# It calculates all values needed for estimating equations.
-  ## mf is the model.frame of the data
+ordinal.scores.logit = function(y, X) {
+  ## y is a numeric vector
+  ## X is a vector or matrix with one or more columns.
+#  require(Design)  ## for the lrm() function
+  require(rms)  ## for the lrm() function
+
+  ## Ensure code works if called from somewhere else (not COBOT.scores()).
+  ## Make X a matrix if it is a vector.  This makes later coding consistent.
+  if(!is.matrix(X)) X = matrix(X, ncol=1)
+
+  ## N: number of subjects; ny: number of y categories
+  N = length(y)
+  ny = length(table(y))
+
+  ## na, nb: number of parameters in alpha and beta
+  na = ny - 1
+  nb = ncol(X)
+  npar = na + nb
+  ## Z is defined as in McCullagh (1980) JRSSB 42:109-142
+  Z = outer(y, 1:ny, "<=")
 
   ## Fit proportional odds model and obtain the MLEs of parameters.
-  mod <- newpolr(mf, Hess=TRUE, method=method)
+  mod = lrm(y ~ X, tol=1e-50, maxit=100)
+  alpha = -mod$coeff[1:na]
+  beta = -mod$coeff[-(1:na)]
+
+  ## Scores are stored for individuals.
+  dl.dtheta = matrix(NA, N, npar)
+  ## Information matrices are stored as sums over all individuals.
+  d2l.dalpha.dalpha = matrix(0,na,na)
+  d2l.dalpha.dbeta = matrix(0,na,nb)
+  d2l.dbeta.dbeta = matrix(0,nb,nb)
+  d2l.dbeta.dalpha = matrix(0,nb,na)
+  ## Predicted probabilities p0 and dp0.dtheta are stored for individuals.
+  p0 = matrix(,N,ny)
+  dp0.dtheta = array(0,c(N,ny,npar))
+  ## Cumulative probabilities
+  Gamma = matrix(0,N,na)
+  dgamma.dtheta = array(0,c(N,na,npar))
+
+  for (i in 1:N) {
+    z = Z[i,]  ## z has length ny
+    x = X[i,]
+
+    ## gamma and phi are defined as in McCullagh (1980)
+    gamma = 1 - 1/(1 + exp(alpha + sum(beta*x))) ## gamma has length na
+    diffgamma = diff(c(gamma,1))
+    invgamma = 1/gamma
+    invgamma2 = invgamma^2
+    invdiffgamma = 1/diffgamma
+    invdiffgamma2 = invdiffgamma^2
+    phi = log(gamma / diffgamma) ## phi has length na
+    Gamma[i,] = gamma
+
+
+#### Some intermediate derivatives
+    ## g(phi) = log(1+exp(phi))
+    dg.dphi = 1 - 1/(1 + exp(phi))
+    ## l is the log likelihood (6.3) in McCullagh (1980)
+    dl.dphi = z[-ny] - z[-1] * dg.dphi
+    t.dl.dphi = t(dl.dphi)
+
+    ## dphi.dgamma is a na*na matrix with rows indexed by phi
+    ## and columns indexed by gamma
+    dphi.dgamma = matrix(0,na,na)
+    diag(dphi.dgamma) = invgamma + invdiffgamma
+    if(na > 1)
+      dphi.dgamma[cbind(1:(na-1), 2:na)] = -invdiffgamma[-na]
+
+    dgamma.base = gamma * (1-gamma)
+    dgamma.dalpha = diagn(dgamma.base)
+    dgamma.dbeta = dgamma.base %o% x
+    dgamma.dtheta[i,,] = cbind(dgamma.dalpha, dgamma.dbeta)
+
+    d2gamma.base = gamma * (1-gamma) * (1-2*gamma)
+
+    ##
+    d2l.dphi.dphi = diagn(-z[-1] * dg.dphi * (1-dg.dphi))
+    d2l.dphi.dalpha = d2l.dphi.dphi %*% dphi.dgamma %*% dgamma.dalpha
+    d2l.dphi.dbeta = d2l.dphi.dphi %*% dphi.dgamma %*% dgamma.dbeta
+
+    ##
+    d2phi.dgamma.dalpha = array(0,c(na,na,na))
+    d2phi.dgamma.dalpha[cbind(1:na,1:na,1:na)] = (-invgamma2 + invdiffgamma2) * dgamma.base
+    if(na > 1) {
+      d2phi.dgamma.dalpha[cbind(1:(na-1),1:(na-1),2:na)] = -invdiffgamma2[-na] * dgamma.base[-1]
+      d2phi.dgamma.dalpha[cbind(1:(na-1),2:na,1:(na-1))] = -invdiffgamma2[-na] * dgamma.base[-na]
+      d2phi.dgamma.dalpha[cbind(1:(na-1),2:na,2:na)] = invdiffgamma2[-na] * dgamma.base[-1]
+    }
+
+    ##
+    d2phi.dgamma.dbeta = array(0,c(na,na,nb))
+    rowdiff = matrix(0,na,na)
+    diag(rowdiff) = 1
+    if(na > 1) rowdiff[cbind(1:(na-1),2:na)] = -1
+    d2phi.dgamma.dbeta.comp1 = diagn(-invdiffgamma2) %*% rowdiff %*% dgamma.dbeta
+    d2phi.dgamma.dbeta.comp2 = diagn(-invgamma2) %*% dgamma.dbeta - d2phi.dgamma.dbeta.comp1
+    for(j in 1:na) {
+      d2phi.dgamma.dbeta[j,j,] = d2phi.dgamma.dbeta.comp2[j,]
+      if(j < na)
+        d2phi.dgamma.dbeta[j,j+1,] = d2phi.dgamma.dbeta.comp1[j,]
+    }
+
+    ##
+    d2gamma.dalpha.dbeta = array(0,c(na,na,nb))
+    for(j in 1:na)
+      d2gamma.dalpha.dbeta[j,j,] = d2gamma.base[j] %o% x
+
+    ##
+    d2gamma.dbeta.dbeta = d2gamma.base %o% x %o% x
+
+
+#### First derivatives of log-likelihood (score functions)
+    dl.dalpha = dl.dphi %*% dphi.dgamma %*% dgamma.dalpha
+    dl.dbeta = dl.dphi %*% dphi.dgamma %*% dgamma.dbeta
+    dl.dtheta[i,] = c(dl.dalpha, dl.dbeta)
+
+
+#### Second derivatives of log-likelihood
+#### Since first derivative is a sum of terms each being a*b*c,
+#### second derivative is a sum of terms each being (a'*b*c+a*b'*c+a*b*c').
+
+#### d2l.dalpha.dalpha
+    ## Obtain aprime.b.c
+    ## Transpose first so that matrix multiplication is meaningful.
+    ## Then transpose so that column is indexed by second alpha.
+    aprime.b.c = t(crossprod(d2l.dphi.dalpha, dphi.dgamma %*% dgamma.dalpha))
+
+    ## Obtain a.bprime.c
+    ## run through the index of second alpha
+    a.bprime.c = matrix(,na,na)
+    for(j in 1:na)
+      a.bprime.c[,j] = t.dl.dphi %*% d2phi.dgamma.dalpha[,,j] %*% dgamma.dalpha
+
+    ## Obtain a.b.cprime
+    ## cprime = d2gamma.dalpha.dalpha = 0 if indices of the two alphas differ.
+    d2gamma.dalpha.dalpha = diagn(d2gamma.base)
+    a.b.cprime = diagn(as.vector(dl.dphi %*% dphi.dgamma %*% d2gamma.dalpha.dalpha))
+
+    ## summing over individuals
+    d2l.dalpha.dalpha = aprime.b.c + a.bprime.c + a.b.cprime + d2l.dalpha.dalpha
+
+
+#### d2l.dalpha.dbeta
+    aprime.b.c = t(crossprod(d2l.dphi.dbeta, dphi.dgamma %*% dgamma.dalpha))
+    a.bprime.c = a.b.cprime = matrix(,na,nb)
+    for(j in 1:nb) {
+      a.bprime.c[,j] = t.dl.dphi %*% d2phi.dgamma.dbeta[,,j] %*% dgamma.dalpha
+      a.b.cprime[,j] = t.dl.dphi %*% dphi.dgamma %*% d2gamma.dalpha.dbeta[,,j]
+    }
+    d2l.dalpha.dbeta = aprime.b.c + a.bprime.c + a.b.cprime + d2l.dalpha.dbeta
+
+
+#### d2l.dbeta.dalpha
+#    dl.dbeta = dl.dphi %*% dphi.dgamma %*% dgamma.dbeta
+#    aprime.b.c = t(crossprod(d2l.dphi.dalpha, dphi.dgamma %*% dgamma.dbeta))
+#    a.bprime.c = a.b.cprime = matrix(,na,nb)
+#    for(j in 1:nb) {
+#      a.bprime.c[,j] = t.dl.dphi %*% d2phi.dgamma.dalpha[,,j] %*% dgamma.dbeta
+#      a.b.cprime[,j] = t.dl.dphi %*% dphi.dgamma %*% d2gamma.dbeta.dalpha[,,j]
+#    }
+#    d2l.dbeta.dalpha = aprime.b.c + a.bprime.c + a.b.cprime + d2l.dbeta.dalpha
+
+
+#### d2l.dbeta.dbeta
+    aprime.b.c = t(crossprod(d2l.dphi.dbeta, dphi.dgamma %*% dgamma.dbeta))
+    a.bprime.c = a.b.cprime = matrix(,nb,nb)
+    for(j in 1:nb) {
+      a.bprime.c[,j] = t.dl.dphi %*% d2phi.dgamma.dbeta[,,j] %*% dgamma.dbeta
+      a.b.cprime[,j] = t.dl.dphi %*% dphi.dgamma %*% d2gamma.dbeta.dbeta[,,j]
+    }
+    d2l.dbeta.dbeta = aprime.b.c + a.bprime.c + a.b.cprime + d2l.dbeta.dbeta 
+
+
+#### Derivatives of predicted probabilities
+    p0[i,] = diff(c(0, gamma, 1))
+
+    rowdiff = matrix(0,ny,na)
+    diag(rowdiff) = 1
+    rowdiff[cbind(2:ny,1:na)] = -1
+    dp0.dalpha = rowdiff %*% dgamma.dalpha
+    dp0.dbeta = rowdiff %*% dgamma.dbeta
+
+    dp0.dtheta[i,,] = cbind(dp0.dalpha, dp0.dbeta)
+  }
+
+#### Final assembly
+  d2l.dtheta.dtheta = rbind(
+    cbind(d2l.dalpha.dalpha, d2l.dalpha.dbeta),
+    cbind(t(d2l.dalpha.dbeta), d2l.dbeta.dbeta))
+
+  ## sandwich variance estimate: ABA', where
+  ## A = (-d2l.dtheta.dtheta/N)^(-1)
+  ## B = B0/N
+  ## One way of coding:
+  ## A0 = solve(d2l.dtheta.dtheta)
+  ## B0 = t(dl.dtheta) %*% dl.dtheta
+  ## var.theta = A0 %*% B0 %*% t(A0)
+  ## Suggested coding for better efficiency and accuracy
+  SS = solve(d2l.dtheta.dtheta, t(dl.dtheta))
+  var.theta = tcrossprod(SS, SS)
+
+  ## The sum of scores should be zero at the MLE.
+  ##   apply(dl.dtheta, 2, sum)
+  ## Sandwich variance estimate should be similar to information matrix, I,
+  ## which is the same as the lrm() output mod$var.
+  ##   I = -solve(d2l.dtheta.dtheta)
+  ##   print(I)
+  ##   print(mod$var)
+  ##   print(var.theta)
+
+  ## dlow.dtheta and dhi.dtheta
+  npar.z = dim(dl.dtheta)[2]
+  dlow.dtheta = dhi.dtheta = matrix(, npar.z, N)
+  for(i in 1:N) {
+    if (y[i] == 1) {
+      dlow.dtheta[,i] <- 0
+    } else {
+      dlow.dtheta[,i] <- dgamma.dtheta[i,y[i]-1,]
+    }
+
+    if (y[i] == ny) {
+      dhi.dtheta[,i] <- 0
+    } else {
+      dhi.dtheta[,i] <- -dgamma.dtheta[i,y[i],]
+    }
+  }
+
+
+  list(mod = mod,
+       dl.dtheta = dl.dtheta,
+       d2l.dtheta.dtheta = d2l.dtheta.dtheta,
+       var.theta = var.theta,
+       p0 = p0,
+       dp0.dtheta = dp0.dtheta,
+       Gamma = Gamma,
+       dgamma.dtheta = dgamma.dtheta,
+       dlow.dtheta=dlow.dtheta,
+       dhi.dtheta=dhi.dtheta)
+}
+
+ordinal.scores <- function(mf, method) {
+  ## mf is the model.frame of the data
+
+  if (method[1]=='logit'){
+    return(ordinal.scores.logit(y=as.numeric(model.response(mf)),X=as.matrix(mf[,2:ncol(mf)])))
+  }
+
+  ## Fit proportional odds model and obtain the MLEs of parameters.
+  mod <- newpolr(mf, Hess=TRUE, method=method,control=list(reltol=1e-50,maxit=100))
   y <- model.response(mf)
   
   ## N: number of subjects; ny: number of y categories
@@ -41,11 +284,11 @@ ordinal.scores <- function(mf, method) {
   e1dcumpr <- cbind(0,mod$dcumpr)
 
   for(i in seq_len(na)) {
-    dp0.dtheta[,,nb+i] <- (.Ycol == i) * edcumpr - (.Ycol == i + 1)*e1dcumpr
+    dp0.dtheta[,,i] <- (.Ycol == i) * edcumpr - (.Ycol == i + 1)*e1dcumpr
   }
 
   for(i in seq_len(nb)) {
-    dp0.dtheta[,,i] <- -mod$dfitted.values * x[,i]
+    dp0.dtheta[,,na+i] <- mod$dfitted.values * x[,i]
   }
   
   ## Cumulative probabilities
@@ -55,16 +298,25 @@ ordinal.scores <- function(mf, method) {
   ## Scores are stored for individuals.
   dl.dtheta = mod$grad
 
+  ## dlow.dtheta and dhigh.dtheta
+  y <- as.integer(y)
+  dcumpr.x <- cbind(0, dcumpr, 0)
+  dlow.dtheta <- t(cbind((col(dcumpr) == (y - 1L)) * dcumpr,
+                         dcumpr.x[cbind(1:N,y)] * x))
+  dhi.dtheta <- t(-cbind((col(dcumpr) == y) * dcumpr,
+                         dcumpr.x[cbind(1:N,y + 1L)] * x))
+
   d2l.dtheta.dtheta <- mod$Hessian
-  
-  
+
   list(mod = mod,
        dl.dtheta = dl.dtheta,
        d2l.dtheta.dtheta = d2l.dtheta.dtheta,
        p0 = p0,
        dp0.dtheta = dp0.dtheta,
        Gamma = Gamma,
-       dcumpr=dcumpr)
+       dcumpr=dcumpr,
+       dlow.dtheta=dlow.dtheta,
+       dhi.dtheta=dhi.dtheta)
 }
 
 #' Conditional ordinal by ordinal tests for association.
@@ -138,7 +390,7 @@ ordinal.scores <- function(mf, method) {
 cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
                   link.x=link,
                   link.y=link,
-                  data, subset, na.action=na.fail) {
+                  data, subset) {
   F1 <- Formula(formula)
   Fx <- formula(F1, lhs=1)
   Fy <- formula(F1, lhs=2)
@@ -148,8 +400,7 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
                "offset"), names(mf), 0L)
   mf <- mf[c(1L, m)]
   mf$drop.unused.levels <- TRUE
-  mf$tmpx <- quote(x)
-  mf$tmpy <- quote(y)
+  mf$na.action <- na.fail
   mf[[1L]] <- as.name("model.frame")
 
 
@@ -170,9 +421,6 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   Terms <- attr(mx, "terms")
   zz <- model.matrix(Terms, mx, contrasts)
   zzint <- match("(Intercept)", colnames(zz), nomatch = 0L)
-
-  
-
   if(zzint > 0L) {
     zz <- zz[, -zzint, drop = FALSE]
   }
@@ -196,26 +444,10 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   mean.Dprob = mean(Dprob)
   T3 = mean.Cprob - mean.Dprob
 
-  dcumpr.xz <- cbind(0, score.xz$dcumpr, 0)
-  dcumpr.yz <- cbind(0, score.yz$dcumpr, 0)
-  dlowx.dthetax <- cbind((col(score.xz$dcumpr) == (xx - 1L)) * score.xz$dcumpr,
-                         dcumpr.xz[cbind(1:N,xx)] * zz)
-  dlowy.dthetay <- cbind((col(score.yz$dcumpr) == (yy - 1L)) * score.yz$dcumpr,
-                         dcumpr.yz[cbind(1:N,yy)] * zz)
-
-  dhix.dthetax <- -cbind((col(score.xz$dcumpr) == xx) * score.xz$dcumpr,
-                         dcumpr.xz[cbind(1:N,xx + 1L)] * zz)
-  dhiy.dthetay <- -cbind((col(score.yz$dcumpr) == yy) * score.yz$dcumpr,
-                         dcumpr.yz[cbind(1:N,yy + 1L)] * zz)
-
-  dCsum.dthetax <- crossprod(dlowx.dthetax, low.y) +
-    crossprod(dhix.dthetax, hi.y)
-  dCsum.dthetay <- crossprod(dlowy.dthetay, low.x) +
-    crossprod(dhiy.dthetay, hi.x)
-  dDsum.dthetax <- crossprod(dlowx.dthetax, hi.y) +
-    crossprod(dhix.dthetax, low.y)
-  dDsum.dthetay <- crossprod(dlowy.dthetay, hi.x) +
-    crossprod(dhiy.dthetay, low.x)
+  dCsum.dthetax = score.xz$dlow.dtheta %*% low.y + score.xz$dhi.dtheta %*% hi.y
+  dCsum.dthetay = score.yz$dlow.dtheta %*% low.x + score.yz$dhi.dtheta %*% hi.x
+  dDsum.dthetax = score.xz$dlow.dtheta %*% hi.y  + score.xz$dhi.dtheta %*% low.y
+  dDsum.dthetay = score.yz$dlow.dtheta %*% hi.x  + score.yz$dhi.dtheta %*% low.x
 
   dT3sum.dtheta = c(dCsum.dthetax-dDsum.dthetax, dCsum.dthetay-dDsum.dthetay)
 
@@ -322,13 +554,13 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   A[npar.xz+(1:npar.yz), npar.xz+(1:npar.yz)] = score.yz$d2l.dtheta.dtheta
   A[Ntheta-6+(1:6), Ntheta-6+(1:6)] = diag(N, 6)
 
-  dxresid.dthetax = dhix.dthetax - dlowx.dthetax
-  dyresid.dthetay = dhiy.dthetay - dlowy.dthetay
-  bigpartial = rbind(c(crossprod(dxresid.dthetax, rep(1, N)), rep(0, npar.yz)),
-    c(rep(0, npar.xz), crossprod(dyresid.dthetay, rep(1, N))),
-    c(crossprod(dxresid.dthetax, yresid), crossprod(dyresid.dthetay, xresid)),
-    c(crossprod(dxresid.dthetax, (2*xresid)), rep(0, npar.yz)),
-    c(rep(0, npar.xz), crossprod(dyresid.dthetay, (2*yresid))))
+  dxresid.dthetax = score.xz$dhi.dtheta - score.xz$dlow.dtheta
+  dyresid.dthetay = score.yz$dhi.dtheta - score.yz$dlow.dtheta
+  bigpartial = rbind(c(dxresid.dthetax %*% rep(1, N), rep(0, npar.yz)),
+    c(rep(0, npar.xz), dyresid.dthetay %*% rep(1, N)),
+    c(dxresid.dthetax %*% yresid, dyresid.dthetay %*% xresid),
+    c(dxresid.dthetax %*% (2*xresid), rep(0, npar.yz)),
+    c(rep(0, npar.xz), dyresid.dthetay %*% (2*yresid)))
   A[Ntheta-6+(1:5), 1:(npar.xz+npar.yz)] = -bigpartial
 
   smallpartial = N *
