@@ -5,7 +5,7 @@ Version: 0.1-0
 Date: 2013-01-15
 Author: Charles Dupont, Chun Li, Bryan Shepherd
 Maintainer: Charles Dupont <charles.dupont@vanderbilt.edu>
-Description: Computes probability scale residuals adn residual correlations
+Description: Computes probability scale residuals and residual correlations
     for continuous, ordinal, binary, count, and time-to-event data (currently
     only implements ordinal data).
 Imports:
