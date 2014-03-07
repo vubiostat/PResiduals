@@ -1,8 +1,6 @@
 ordinal.scores.logit = function(y, X) {
   ## y is a numeric vector
   ## X is a vector or matrix with one or more columns.
-#  require(Design)  ## for the lrm() function
-  require(rms)  ## for the lrm() function
 
   ## Ensure code works if called from somewhere else (not COBOT.scores()).
   ## Make X a matrix if it is a vector.  This makes later coding consistent.
