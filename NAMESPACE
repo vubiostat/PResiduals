@@ -1,6 +1,8 @@
 export(cobot)
 export(diagn)
 export(GKGamma)
+export(cocobot)
 import(Formula)
 importFrom(rms,lrm)
+importFrom(sandwich,bread,estfun)
 S3method(print,cobot)
