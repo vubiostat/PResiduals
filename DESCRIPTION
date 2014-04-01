@@ -19,6 +19,7 @@ Collate:
     'newPolr.R'
     'pgumbel.R'
     'cobot.R'
-    'cocobot.R'
     'print.cobot.R'
+    'cocobot.R'
+    'print.cocobot.R'
     'PResiduals-package.R'

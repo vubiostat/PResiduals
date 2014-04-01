@@ -143,7 +143,7 @@ dlatent.dtheta <- function(ord.resid, ordinal.scores,y){
 cor.TS = function(xresid, yresid,
                   xz.dl.dtheta, yz.dl.dtheta,
                   xz.d2l.dtheta.dtheta, yz.d2l.dtheta.dtheta,
-                  dxresid.dthetax, dyresid.dthetay){
+                  dxresid.dthetax, dyresid.dthetay,fisher=FALSE){
   
   TS = cor(xresid, yresid)
   
@@ -203,18 +203,21 @@ cor.TS = function(xresid, yresid,
   var.theta = tcrossprod (SS, SS)
   varTS = var.theta[Ntheta, Ntheta]
   pvalTS = 2 * pnorm( -abs(TS)/sqrt(varTS))
-  ####Fisher's transformation
-  TS_f <- log( (1+TS)/(1-TS) )
-  var.TS_f <- varTS*(2/(1-TS^2))^2
-  pvalTS_f <- 2 * pnorm( -abs(TS_f)/sqrt(var.TS_f))
+
+  if (fisher==TRUE){
+    ####Fisher's transformation
+    TS_f <- log( (1+TS)/(1-TS) )
+    var.TS_f <- varTS*(2/(1-TS^2))^2
+    pvalTS <- 2 * pnorm( -abs(TS_f)/sqrt(var.TS_f))
+  }
   
-  list(TS=TS,var.TS=varTS, pval.TS=pvalTS, TS.f=TS_f, var.TS_f=var.TS_f, pval.TS_f=pvalTS_f)
+  list(TS=TS,var.TS=varTS, pval.TS=pvalTS)
 }
 
 cocobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
                   link.x=link,
                   link.y=link,
-                  data, subset) {
+                  data, subset,emp=TRUE,fisher=FALSE) {
   F1 <- Formula(formula)
   Fx <- formula(F1, lhs=1)
   Fy <- formula(F1, lhs=2)
@@ -251,25 +254,58 @@ cocobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   yz.dresid.dtheta = yz.score$dresid.dtheta
   
   ### presid vs obs-exp
-#  ts1 <-  cor.TS(xresid, yresid,
-#                 xz.score$dl.dtheta, yz.score$dl.dtheta,
-#                 xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
-#                 xz.dresid.dtheta, yz.dresid.dtheta)
-  
-  ### presid vs presid (use pdf of normal)
-  ts2 = cor.TS(xresid, ypresid,
-               xz.score$dl.dtheta, yz.score$dl.dtheta,
-               xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
-               xz.dresid.dtheta, yz.dpresid.dtheta)
-
-  ### presid vs presid (emprical)
-  ts2.k = cor.TS(xresid, ypresid.k,
+  ta <-  cor.TS(xresid, yresid,
                  xz.score$dl.dtheta, yz.score$dl.dtheta,
                  xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
-                 xz.dresid.dtheta, yz.score$dpresid.dtheta.k)
+                 xz.dresid.dtheta, yz.dresid.dtheta,fisher)
+  ta.label <- 'PResid vs. Obs-Exp'
+  
+  if (emp==TRUE){
+    ### presid vs presid (emprical)
+    tb = cor.TS(xresid, ypresid.k,
+                 xz.score$dl.dtheta, yz.score$dl.dtheta,
+                 xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
+                 xz.dresid.dtheta, yz.score$dpresid.dtheta.k,fisher)
+    tb.label = "PResid vs. PResid (empirical)"
+  } else {
+    ### presid vs presid (use pdf of normal)
+    tb = cor.TS(xresid, ypresid,
+               xz.score$dl.dtheta, yz.score$dl.dtheta,
+               xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
+               xz.dresid.dtheta, yz.dpresid.dtheta,fisher)
+    tb.label = "PResid vs. PResid (assume normality)"
 
-  structure(list(T2=ts2$TS, varT2=ts2$var.TS, pvalT2=ts2$pval.TS,T2.E=ts2.k$TS, varT2.E=ts2.k$var.TS,pvalT2.E=ts2.k$pval.TS), class="cocobot")
+  }
+
+  ### latent.resid vs obs-exp
+  tc <- cor.TS(xlatent.resid, yresid,
+                xz.score$dl.dtheta, yz.score$dl.dtheta,
+                xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
+                xz.dlatent.resid.dtheta, yz.dresid.dtheta,fisher)
+  tc.label <- 'Latent.resid vs. Obs-Exp'
+
+  ### latent.resid vs presid
+  td <- cor.TS(xlatent.resid, ypresid,
+                xz.score$dl.dtheta, yz.score$dl.dtheta,
+                xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
+                xz.dlatent.resid.dtheta, yz.dpresid.dtheta,fisher)
+  td.label <- 'Latent.resid vs. PResid'
+
+
+  structure(
+    list(
+      TS=list(
+        TA=list(ts=ta$TS, var=ta$var.TS, pval=ta$pval.TS,
+            label=ta.label),
+        TB=list(ts=tb$TS, var=tb$var.TS, pval=tb$pval.TS,
+            label=tb.label),
+        TC=list(ts=tc$TS, var=tc$var.TS, pval=tc$pval.TS,
+            label=tc.label),
+        TD=list(ts=td$TS, var=td$var.TS, pval=td$pval.TS,
+            label=td.label)
+      ),
+      fisher=fisher
+    ), 
+    class="cocobot"
+  )
 }
-
-
-
