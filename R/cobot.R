@@ -388,7 +388,7 @@ ordinal.scores <- function(mf, method) {
 cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
                   link.x=link,
                   link.y=link,
-                  data, subset) {
+                  data, subset, na.action=na.fail,fisher=FALSE) {
   F1 <- Formula(formula)
   Fx <- formula(F1, lhs=1)
   Fy <- formula(F1, lhs=2)
@@ -398,7 +398,7 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
                "offset"), names(mf), 0L)
   mf <- mf[c(1L, m)]
   mf$drop.unused.levels <- TRUE
-  mf$na.action <- na.fail
+  mf$na.action <- na.action
   mf[[1L]] <- as.name("model.frame")
 
 
@@ -577,7 +577,17 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   var.theta = tcrossprod(SS, SS)
   varT2 = var.theta[Ntheta, Ntheta]
 
-  pvalT2 = 2 * pnorm(-abs(T2)/sqrt(varT2))
+  if (fisher==TRUE){
+    ####Fisher's transformation
+    ## TS_f: transformed the test statistics
+    ## var.TS_f: variance estimate for ransformed test statistics
+    ## pvalT2: p-value based on transformed test statistics
+    TS_f <- log( (1+T2)/(1-T2) )  
+    var.TS_f <- varT2*(2/(1-T2^2))^2 
+    pvalT2 <- 2 * pnorm( -abs(TS_f)/sqrt(var.TS_f))  
+  } else {
+    pvalT2 = 2 * pnorm(-abs(T2)/sqrt(varT2))
+  }
 
 
 #### Asymptotics for T1 = tau - tau0
