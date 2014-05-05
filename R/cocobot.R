@@ -1,37 +1,14 @@
-ord.resid <- function(y, x){
-  if (!is.matrix(x)) x = matrix(x, ncol=1)
-  ny = length(table(y))
-  nay = ny - 1
-  N = length(y)
-  assign("EE", 0, pos=1)
-  suppressWarnings(tryCatch(assign("mod", lrm(y ~ x, tol=1e-50, maxit=100)),
-                            error = function(x) assign("EE", 1, pos=1)))
-  ## Obtain predicted cumulative probabilities.  Each subject is a column.
-  ## Because lrm() fits y>=c instead of y<=c, the cumulative probabilities
-  ## are 1- 1/[1+exp(-alpha-beta*z)] = 1/[1+exp(alpha+beta*z)]
-  py = (1 + exp(outer(mod$coeff[1:nay],
-                      as.vector(x%*%mod$coeff[-(1:nay)]), "+"))) ^ (-1)
-  if(EE == 1) return(presid=NULL )
-  
-  low.y = rbind(0,py)[cbind(y,1:N)]
-  hi.y = 1 - rbind(py,1)[cbind(y,1:N)]
-  
-  rij <- rbind(py,1)[cbind(y,1:N)]
-  rij_1  <- rbind(0,py)[cbind(y,1:N)]
-  pij = rij -rij_1
-  G.inverse <- function(p) log(p / (1 - p))
-  
-  latent.resid <- rep(NA, N)
-  for (i in 1:N){
-    latent.resid[i] <- integrate(G.inverse, rij_1[i], rij[i])$value/pij[i]
-  }
-  
-  
-  list(presid = low.y - hi.y, latent.resid=latent.resid, rij=rij, rij_1=rij_1)
+#### better to add to "pgumbel.R"
+qgumbel <- function(p, loc = 0, scale = 1, lower.tail = TRUE)
+{
+  if(!lower.tail) p <- 1-p 
+  q <- -log(-log(p))
+  q <- loc + scale * q
+  return(q)
 }
 
 
-lm.score = function(y, X){
+lm.scores = function(y, X){
   N = length(y)  
   mod = lm(y~X)
   smod = summary(mod)
@@ -66,81 +43,8 @@ lm.score = function(y, X){
        dpresid.dtheta.k = dpresid.dtheta.k)
 }
 
-###copy from cobot, add dgammaij_1.dtheta
 
-
-ordinal.dresid.dtheta = function(ordinal.scores, y){
-
-  N = length(y)
-  ny = length(table(y))
-  yy = y
-  npar = dim(ordinal.scores$dl.dtheta)[2]
-  dgamma.dtheta = ordinal.scores$dgamma.dtheta
-  dlow.dtheta = dhi.dtheta = matrix(, npar, N)
-  for(i in 1:N) {
-    if (yy[i] == 1) {
-      dlow.dtheta[,i] <- 0
-    } else {
-      dlow.dtheta[,i] <- dgamma.dtheta[i,yy[i]-1,]
-    }
-    
-    
-    if (yy[i] == ny) {
-      dhi.dtheta[,i] <- 0
-    } else {
-      dhi.dtheta[,i] <- -dgamma.dtheta[i,yy[i],]
-    }
-  }
-  dresid.dtheta = dlow.dtheta - dhi.dtheta
-  
-}
-
-dlatent.dtheta <- function(ord.resid, ordinal.scores,y){
-  G.inverse <- function(p) log(p / (1 - p))
-  N = length(y)
-  ny = length(table(y))
-  yy = y
-  npar = dim(ordinal.scores$dl.dtheta)[2]
-  dgamma.dtheta = ordinal.scores$dgamma.dtheta
-  dp0.dtheta = ordinal.scores$dp0.dtheta
-  
-  latent.resid <- ord.resid$latent.resid
-  rij <- ord.resid$rij
-  rij_1 <- ord.resid$rij_1
-  pij <- rij-rij_1
-  
-  dlatent.dtheta = drij.dtheta = drij_1.dtheta = dpij.dtheta = matrix(, npar, N)
- 
-  for(i in 1:N) {
-    if (yy[i] == 1) {
-      drij_1.dtheta[,i] <- 0
-    } else {
-      drij_1.dtheta[,i] <- dgamma.dtheta[i,yy[i]-1,]
-    }
-       
-    if (yy[i] == ny) {
-      drij.dtheta[,i] <- 0
-    } else {
-      drij.dtheta[,i] <- dgamma.dtheta[i,yy[i],]
-    }
-    
-    dpij.dtheta[,i] <- dp0.dtheta[i, yy[i],]
-    
-    if (yy[i] == 1) {
-      dlatent.dtheta[,i] <- -latent.resid[i]/pij[i]*dpij.dtheta[,i] + 1/pij[i]*(
-        G.inverse(rij[i])*drij.dtheta[,i] - 0 )
-    } else if(yy[i] == ny){
-      dlatent.dtheta[,i] <- -latent.resid[i]/pij[i]*dpij.dtheta[,i] + 1/pij[i]*(
-        0 - G.inverse(rij_1[i])*drij_1.dtheta[,i] )
-    } else
-      dlatent.dtheta[,i] <- -latent.resid[i]/pij[i]*dpij.dtheta[,i] + 1/pij[i]*(
-        G.inverse(rij[i])*drij.dtheta[,i] - G.inverse(rij_1[i])*drij_1.dtheta[,i])
-  }
-  
-  return(dlatent.dtheta)
-}
-
-cor.TS = function(xresid, yresid,
+corTS = function(xresid, yresid,
                   xz.dl.dtheta, yz.dl.dtheta,
                   xz.d2l.dtheta.dtheta, yz.d2l.dtheta.dtheta,
                   dxresid.dthetax, dyresid.dthetay,fisher=FALSE){
@@ -203,7 +107,7 @@ cor.TS = function(xresid, yresid,
   var.theta = tcrossprod (SS, SS)
   varTS = var.theta[Ntheta, Ntheta]
   pvalTS = 2 * pnorm( -abs(TS)/sqrt(varTS))
-
+  
   if (fisher==TRUE){
     ####Fisher's transformation
     TS_f <- log( (1+TS)/(1-TS) )
@@ -214,10 +118,11 @@ cor.TS = function(xresid, yresid,
   list(TS=TS,var.TS=varTS, pval.TS=pvalTS)
 }
 
-cocobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
-                  link.x=link,
-                  link.y=link,
-                  data, subset,emp=TRUE,fisher=FALSE) {
+
+### formula x|y ~z, x is ordinal and y is continous
+cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit"),
+                      subset, na.action=na.fail, 
+                      emp=TRUE,fisher=FALSE) {
   F1 <- Formula(formula)
   Fx <- formula(F1, lhs=1)
   Fy <- formula(F1, lhs=2)
@@ -227,85 +132,154 @@ cocobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
                "offset"), names(mf), 0L)
   mf <- mf[c(1L, m)]
   mf$drop.unused.levels <- TRUE
-  mf$na.action <- na.fail
+  mf$na.action <- na.action
   mf[[1L]] <- as.name("model.frame")
-
+  
+  
   mx <- my <- mf
-
+  
   mx[["formula"]] <- Fx
   my[["formula"]] <- Fy
-
+  
   mx <- eval(mx, parent.frame())
   my <- eval(my, parent.frame())
+  
+  score.xz <- ordinal.scores(mx, method=link)
+  score.yz <- lm.scores(y=model.response(my), X=as.matrix(my[,2:ncol(my)]))
+  
+  npar.xz = dim(score.xz$dl.dtheta)[2]
+  npar.yz = dim(score.yz$dl.dtheta)[2]
+  
+  Terms <- attr(mx, "terms")
+  zz <- model.matrix(Terms, mx, contrasts)
+  zzint <- match("(Intercept)", colnames(zz), nomatch = 0L)
+  if(zzint > 0L) {
+    zz <- zz[, -zzint, drop = FALSE]
+  }
+  
+  xx = as.integer(model.response(mx))
 
-  xz.score = ordinal.scores(mx,method=link.x)
-  yz.score = lm.score(data$y, data$z)
-  xz.resid = ord.resid(as.integer(data$x), data$z)
-  xresid = xz.resid$presid
-  xlatent.resid = xz.resid$latent.resid
+  nx = length(table(xx))
+
+  N = length(xx)
+  low.x = cbind(0, score.xz$Gamma)[cbind(1:N, xx)]
+  hi.x = cbind(1-score.xz$Gamma, 0)[cbind(1:N, xx)]
+
+  xz.presid <- low.x - hi.x
+  xz.dpresid.dtheta <- score.xz$dlow.dtheta - score.xz$dhi.dtheta
   
-  ypresid = yz.score$presid
-  ypresid.k = yz.score$presid.k
-  yresid = yz.score$resid
-  
-  xz.dresid.dtheta = ordinal.dresid.dtheta (xz.score, as.integer(data$x))
-  xz.dlatent.resid.dtheta = dlatent.dtheta(ord.resid=xz.resid,ordinal.scores=xz.score, y=as.integer(data$x))
-  yz.dpresid.dtheta = yz.score$dpresid.dtheta
-  yz.dresid.dtheta = yz.score$dresid.dtheta
-  
+
+  ## return value
+  ans <- list(TS=list(),fisher=fisher)
+
   ### presid vs obs-exp
-  ta <-  cor.TS(xresid, yresid,
-                 xz.score$dl.dtheta, yz.score$dl.dtheta,
-                 xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
-                 xz.dresid.dtheta, yz.dresid.dtheta,fisher)
-  ta.label <- 'PResid vs. Obs-Exp'
+  ta <-  corTS(xz.presid, score.yz$resid,
+                score.xz$dl.dtheta, score.yz$dl.dtheta,
+                score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+                xz.dpresid.dtheta, score.yz$dresid.dtheta, fisher)
+  ans$TS$TA <- 
+      list( 
+        ts=ta$TS, var=ta$var.TS, pval=ta$pval.TS,
+        label='PResid vs. Obs-Exp'
+      )
   
   if (emp==TRUE){
     ### presid vs presid (emprical)
-    tb = cor.TS(xresid, ypresid.k,
-                 xz.score$dl.dtheta, yz.score$dl.dtheta,
-                 xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
-                 xz.dresid.dtheta, yz.score$dpresid.dtheta.k,fisher)
+    tb = corTS(xz.presid, score.yz$presid.k,
+                score.xz$dl.dtheta, score.yz$dl.dtheta,
+                score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+                xz.dpresid.dtheta, score.yz$dpresid.dtheta.k,fisher)
     tb.label = "PResid vs. PResid (empirical)"
   } else {
     ### presid vs presid (use pdf of normal)
-    tb = cor.TS(xresid, ypresid,
-               xz.score$dl.dtheta, yz.score$dl.dtheta,
-               xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
-               xz.dresid.dtheta, yz.dpresid.dtheta,fisher)
+    tb = corTS(xz.presid, score.yz$presid,
+                score.xz$dl.dtheta, score.yz$dl.dtheta,
+                score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+                xz.dpresid.dtheta, score.yz$dpresid.dtheta,fisher)
     tb.label = "PResid vs. PResid (assume normality)"
-
+    
   }
+  ans$TS$TB <- 
+      list( 
+        ts=tb$TS, var=tb$var.TS, pval=tb$pval.TS,
+        label = tb.label
+      )
 
-  ### latent.resid vs obs-exp
-  tc <- cor.TS(xlatent.resid, yresid,
-                xz.score$dl.dtheta, yz.score$dl.dtheta,
-                xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
-                xz.dlatent.resid.dtheta, yz.dresid.dtheta,fisher)
-  tc.label <- 'Latent.resid vs. Obs-Exp'
+  rij <- cbind(score.xz$Gamma, 1)[cbind(1:N, xx)]
+  rij_1 <- cbind(0,score.xz$Gamma)[cbind(1:N, xx)]
+  pij <- rij-rij_1
 
-  ### latent.resid vs presid
-  td <- cor.TS(xlatent.resid, ypresid,
-                xz.score$dl.dtheta, yz.score$dl.dtheta,
-                xz.score$d2l.dtheta.dtheta, yz.score$d2l.dtheta.dtheta,
-                xz.dlatent.resid.dtheta, yz.dpresid.dtheta,fisher)
-  td.label <- 'Latent.resid vs. PResid'
+  G.inverse <- switch(link[1], logit = qlogis, probit = qnorm,
+                 cloglog = qgumbel, cauchit = qcauchy)
+  xz.latent.resid <- rep(NA, N)
+  
+  inverse_fail <- FALSE 
+  for (i in 1:N){
+    tmp <- try(integrate(G.inverse, rij_1[i], rij[i])$value/pij[i],silent=TRUE)
+    if (inherits(tmp,'try-error')){
+      warning("Cannot compute something")
+      inverse_fail <- TRUE
+      break
+    } else {
+      xz.latent.resid[i] <- tmp
+    }
+  }
+  
+  if (!inverse_fail){
+    ### To compute dlatent.dtheta (need dgamma.dtheta and dp0.dtheta from ordinal scores)
+    xz.dlatent.dtheta = dpij.dtheta = matrix(, npar.xz, N)
 
-
-  structure(
-    list(
-      TS=list(
-        TA=list(ts=ta$TS, var=ta$var.TS, pval=ta$pval.TS,
-            label=ta.label),
-        TB=list(ts=tb$TS, var=tb$var.TS, pval=tb$pval.TS,
-            label=tb.label),
-        TC=list(ts=tc$TS, var=tc$var.TS, pval=tc$pval.TS,
-            label=tc.label),
-        TD=list(ts=td$TS, var=td$var.TS, pval=td$pval.TS,
-            label=td.label)
-      ),
-      fisher=fisher
-    ), 
-    class="cocobot"
-  )
+    drij_1.dtheta <- score.xz$dlow.dtheta
+    drij.dtheta <- -score.xz$dhi.dtheta
+    for(i in 1:N) {  
+      dpij.dtheta[,i] <- score.xz$dp0.dtheta[i, xx[i],]
+      
+      if (xx[i] == 1) {
+        xz.dlatent.dtheta[,i] <- -xz.latent.resid[i]/pij[i]*dpij.dtheta[,i] + 1/pij[i]*(
+          G.inverse(rij[i])*drij.dtheta[,i] - 0 )
+      } else if(xx[i] == nx){
+        xz.dlatent.dtheta[,i] <- -xz.latent.resid[i]/pij[i]*dpij.dtheta[,i] + 1/pij[i]*(
+          0 - G.inverse(rij_1[i])*drij_1.dtheta[,i] )
+      } else
+        xz.dlatent.dtheta[,i] <- -xz.latent.resid[i]/pij[i]*dpij.dtheta[,i] + 1/pij[i]*(
+          G.inverse(rij[i])*drij.dtheta[,i] - G.inverse(rij_1[i])*drij_1.dtheta[,i])
+    }
+    
+    
+    ### latent.resid vs obs-exp
+    tc <- corTS(xz.latent.resid, score.yz$resid,
+                 score.xz$dl.dtheta, score.yz$dl.dtheta,
+                 score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+                 xz.dlatent.dtheta, score.yz$dresid.dtheta,fisher)
+    ans$TS$TC <- 
+        list( 
+          ts=tc$TS, var=tc$var.TS, pval=tc$pval.TS,
+          label = 'Latent.resid vs. Obs-Exp'
+        )
+    
+    if (emp==TRUE){
+      ### latent vs presid (emprical)
+      td = corTS(xz.latent.resid, score.yz$presid.k,
+                  score.xz$dl.dtheta, score.yz$dl.dtheta,
+                  score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+                  xz.dlatent.dtheta, score.yz$dpresid.dtheta.k,fisher)
+      td.label = "Latent.resid  vs. PResid (empirical)"
+    } else {
+      ### latent vs presid (use pdf of normal)
+      td = corTS(xz.latent.resid, score.yz$presid,
+                  score.xz$dl.dtheta, score.yz$dl.dtheta,
+                  score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+                  xz.dlatent.dtheta, score.yz$dpresid.dtheta,fisher)
+      td.label = "Latent.resid  vs. PResid (assume normality)"
+      
+    }
+    ans$TS$TD <- 
+        list( 
+          ts=td$TS, var=td$var.TS, pval=td$pval.TS,
+          label = td.label
+        )
+  }
+  
+  structure(ans, class="cocobot")
+  
 }
