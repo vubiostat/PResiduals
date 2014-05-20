@@ -241,70 +241,135 @@ ordinal.scores <- function(mf, method) {
   ## mf is the model.frame of the data
 
   if (method[1]=='logit'){
-    return(ordinal.scores.logit(y=as.numeric(model.response(mf)),X=as.matrix(mf[,2:ncol(mf)])))
+#    return(ordinal.scores.logit(y=as.numeric(model.response(mf)),X=as.matrix(mf[,2:ncol(mf)])))
   }
 
-  ## Fit proportional odds model and obtain the MLEs of parameters.
-  mod <- newpolr(mf, Hess=TRUE, method=method,control=list(reltol=1e-50,maxit=100))
-  y <- model.response(mf)
+  if (length(levels(model.response(mf))) < 3) {
+      mod <- glm(mf, family=binomial(link=method))
+
+      y <- mod$y + 1L
+
+      N <- length(y)
+
+      ny <- 2L
+      na <- ny - 1L
+
+      Terms <- attr(mf, "terms")
+      x <- model.matrix(Terms, mf, contrasts)
+      xint <- match("(Intercept)", colnames(x), nomatch = 0L)
+
+      if(xint > 0L) {
+          x <- x[, -xint, drop = FALSE]
+      }
+      
+      nb <- ncol(x)
+      npar <- na+nb
+
+      alpha <- coef(mod)[1]
+      beta <- -coef(mod)[-1]
+      
+      eta <- mod$linear.predictors
+
+      Y <- matrix(nrow=N,ncol=ny)
+      .Ycol <- col(Y)
+
+      pfun <- switch(method, logit = plogis, probit = pnorm,
+                     cloglog = pgumbel, cauchit = pcauchy)
+      dfun <- switch(method, logit = dlogis, probit = dnorm,
+                     cloglog = dgumbel, cauchit = dcauchy)
+      cumpr <- matrix(pfun(matrix(alpha, N, 1L, byrow=TRUE) - eta), , 1L)
+      dcumpr <- matrix(dfun(matrix(alpha, N, 1L, byrow=TRUE) - eta), , 1L)
+
+      fitted <- t(apply(cumpr, 1L, function(x) diff(c(0, x, 1))))
+      dfitted <- t(apply(dcumpr, 1L, function(x) diff(c(0, x, 0))))
+      
+      p0 <-  fitted
+      dp0.dtheta <- array(dim=c(N, ny, npar))
+
+      edcumpr <- cbind(dcumpr, 0)
+      e1dcumpr <- cbind(0, dcumpr)
+
+      dp0.dtheta[,,1] <- (.Ycol == 1)*edcumpr - (.Ycol == 2)*e1dcumpr
+
+      for(i in seq(nb)) {
+          dp0.dtheta[,,na+i] <- dfitted * x[,i]
+      }
+
+      Gamma = cumpr
+      dl.dtheta = estfun(mod)
+
+      y <- as.integer(y)
+      dcumpr.x <- cbind(0, dcumpr, 0)
+      dlow.dtheta <- t(cbind((col(dcumpr) == (y - 1L)) * dcumpr,
+                             dcumpr.x[cbind(1:N,y)] * x))
+      dhi.dtheta <- t(-cbind((col(dcumpr) == y) * dcumpr,
+                             dcumpr.x[cbind(1:N,y + 1L)] * x))
+
+      
+      d2l.dtheta.dtheta = - solve(bread(mod))*N
+  } else {
+      ## Fit proportional odds model and obtain the MLEs of parameters.
+      mod <- newpolr(mf, Hess=TRUE, method=method,control=list(reltol=1e-50,maxit=100))
+      y <- model.response(mf)
   
-  ## N: number of subjects; ny: number of y categories
-  N = length(y)
-  ny = length(mod$lev)
+      ## N: number of subjects; ny: number of y categories
+      N = length(y)
+      ny = length(mod$lev)
 
-  ## na, nb: number of parameters in alpha and beta
-  na = ny - 1
+      ## na, nb: number of parameters in alpha and beta
+      na = ny - 1
 
-  Terms <- attr(mf, "terms")
-  x <- model.matrix(Terms, mf, contrasts)
-  xint <- match("(Intercept)", colnames(x), nomatch = 0L)
+      Terms <- attr(mf, "terms")
+      x <- model.matrix(Terms, mf, contrasts)
+      xint <- match("(Intercept)", colnames(x), nomatch = 0L)
 
-  nb = ncol(x)
+      nb = ncol(x)
 
-  if(xint > 0L) {
-    x <- x[, -xint, drop = FALSE]
-    nb <- nb - 1L
+      if(xint > 0L) {
+          x <- x[, -xint, drop = FALSE]
+          nb <- nb - 1L
+      }
+  
+      npar = na + nb
+      
+      alpha = mod$zeta
+      beta = -coef(mod)
+      eta <- mod$lp
+
+      ## Predicted probabilities p0 and dp0.dtheta are stored for individuals.
+      p0 = mod$fitted.values
+      dp0.dtheta = array(dim=c(N, ny, npar))
+      Y <- matrix(nrow=N,ncol=ny)
+      .Ycol <- col(Y)
+
+      edcumpr <- cbind(mod$dcumpr, 0)
+      e1dcumpr <- cbind(0,mod$dcumpr)
+      
+      for(i in seq_len(na)) {
+          dp0.dtheta[,,i] <- (.Ycol == i) * edcumpr - (.Ycol == i + 1)*e1dcumpr
+      }
+
+      for(i in seq_len(nb)) {
+          dp0.dtheta[,,na+i] <- mod$dfitted.values * x[,i]
+      }
+  
+      ## Cumulative probabilities
+      Gamma = mod$cumpr
+      dcumpr <- mod$dcumpr
+  
+      ## Scores are stored for individuals.
+      dl.dtheta = mod$grad
+
+      ## dlow.dtheta and dhigh.dtheta
+      y <- as.integer(y)
+      dcumpr.x <- cbind(0, dcumpr, 0)
+      dlow.dtheta <- t(cbind((col(dcumpr) == (y - 1L)) * dcumpr,
+                             dcumpr.x[cbind(1:N,y)] * x))
+      dhi.dtheta <- t(-cbind((col(dcumpr) == y) * dcumpr,
+                             dcumpr.x[cbind(1:N,y + 1L)] * x))
+
+      d2l.dtheta.dtheta <- mod$Hessian
   }
-  
-  npar = na + nb
-
-  alpha = mod$zeta
-  beta = -coef(mod)
-  eta <- mod$lp
-
-  ## Predicted probabilities p0 and dp0.dtheta are stored for individuals.
-  p0 = mod$fitted.values
-  dp0.dtheta = array(dim=c(N, ny, npar))
-  Y <- matrix(nrow=N,ncol=ny)
-  .Ycol <- col(Y)
-
-  edcumpr <- cbind(mod$dcumpr, 0)
-  e1dcumpr <- cbind(0,mod$dcumpr)
-
-  for(i in seq_len(na)) {
-    dp0.dtheta[,,i] <- (.Ycol == i) * edcumpr - (.Ycol == i + 1)*e1dcumpr
-  }
-
-  for(i in seq_len(nb)) {
-    dp0.dtheta[,,na+i] <- mod$dfitted.values * x[,i]
-  }
-  
-  ## Cumulative probabilities
-  Gamma = mod$cumpr
-  dcumpr <- mod$dcumpr
-  
-  ## Scores are stored for individuals.
-  dl.dtheta = mod$grad
-
-  ## dlow.dtheta and dhigh.dtheta
-  y <- as.integer(y)
-  dcumpr.x <- cbind(0, dcumpr, 0)
-  dlow.dtheta <- t(cbind((col(dcumpr) == (y - 1L)) * dcumpr,
-                         dcumpr.x[cbind(1:N,y)] * x))
-  dhi.dtheta <- t(-cbind((col(dcumpr) == y) * dcumpr,
-                         dcumpr.x[cbind(1:N,y + 1L)] * x))
-
-  d2l.dtheta.dtheta <- mod$Hessian
 
   list(mod = mod,
        dl.dtheta = dl.dtheta,
