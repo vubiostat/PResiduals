@@ -222,16 +222,11 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
   # TODO: test the different na.x options
   # TODO: Only subset when na.action==na.omit
   if (nrow(mx) != nrow(my)){
-    n <- max(nrow(mx),nrow(my))
     i_rows <- intersect(row.names(mx),row.names(my))
     mx <- mx[row.names(mx) %in% i_rows,]
     my <- my[row.names(my) %in% i_rows,]
-    data.points <- nrow(mx)
-    data.missing <- n - data.points
-  } else {
-    data.points <- nrow(mx)
-    data.missing <- 0
   }
+  data.points <- nrow(mx)
 
   # TODO: output number of data points used vs. number of missing
 
@@ -276,8 +271,7 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
           TS=list(),
           fisher=fisher,
           conf.int=conf.int,
-          data.points=data.points,
-          data.missing=data.missing
+          data.points=data.points
          )
 
   ### presid vs obs-exp

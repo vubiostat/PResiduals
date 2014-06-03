@@ -403,18 +403,17 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   mx <- eval(mx, parent.frame())
   my <- eval(my, parent.frame())
 
+  # TODO: pin down exactly how to merge mx and my, possibly with extra arguments to model.frame
+  # don't use nrow() != nrow() since they could have the same number of missing
+  # same for cocobot
   if (nrow(mx) != nrow(my)){
     stop("Lengths differ ",nrow(mx)," ",nrow(my))
     n <- max(nrow(mx),nrow(my))
     i_rows <- intersect(row.names(mx),row.names(my))
     mx <- mx[row.names(mx) %in% i_rows,]
     my <- my[row.names(my) %in% i_rows,]
-    data.points <- nrow(mx)
-    data.missing <- n - data.points
-  } else {
-    data.points <- nrow(mx)
-    data.missing <- 0
   }
+  data.points <- nrow(mx)
 
   Terms <- attr(mx, "terms")
   zz <- model.matrix(Terms, mx, contrasts)
@@ -733,8 +732,7 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
             ),
             fisher=fisher, 
             conf.int=conf.int,
-            data.points=data.points,
-            data.missing=data.missing
+            data.points=data.points
           ),
           class="cobot")
 
