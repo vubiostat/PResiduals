@@ -403,6 +403,19 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   mx <- eval(mx, parent.frame())
   my <- eval(my, parent.frame())
 
+  if (nrow(mx) != nrow(my)){
+    stop("Lengths differ ",nrow(mx)," ",nrow(my))
+    n <- max(nrow(mx),nrow(my))
+    i_rows <- intersect(row.names(mx),row.names(my))
+    mx <- mx[row.names(mx) %in% i_rows,]
+    my <- my[row.names(my) %in% i_rows,]
+    data.points <- nrow(mx)
+    data.missing <- n - data.points
+  } else {
+    data.points <- nrow(mx)
+    data.missing <- 0
+  }
+
   Terms <- attr(mx, "terms")
   zz <- model.matrix(Terms, mx, contrasts)
   zzint <- match("(Intercept)", colnames(zz), nomatch = 0L)
@@ -711,5 +724,26 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   varT1 = sum(SS^2)
   pvalT1 = 2 * pnorm(-abs(T1)/sqrt(varT1))
 
-  structure(list(T1=T1, varT1=varT1, pvalT1=pvalT1, T2=T2, varT2=varT2, pvalT2=pvalT2, T3=T3, varT3=varT3, pvalT3=pvalT3,fisher=fisher), class="cobot")
+  ans <- structure(
+          list(
+            TS=list(
+              T1=list(ts=T1, var=varT1, pval=pvalT1, label="Gamma(Obs) - Gamma(Exp)"), 
+              T2=list(ts=T2, var=varT2, pval=pvalT2, label="Correlation of Residuals"),
+              T3=list(ts=T3, var=varT3, pval=pvalT3, label="Covariance of Residuals")
+            ),
+            fisher=fisher, 
+            conf.int=conf.int,
+            data.points=data.points,
+            data.missing=data.missing
+          ),
+          class="cobot")
+
+  # Apply confidence intervals
+  for (i in seq_len(length(ans$TS))){
+    ts_ci <- getCI(ans$TS[[i]]$ts,ans$TS[[i]]$var,ans$fisher,conf.int)
+    ans$TS[[i]]$lower <- ts_ci[1]
+    ans$TS[[i]]$upper <- ts_ci[2]
+  }
+
+  ans
 }

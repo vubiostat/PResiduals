@@ -7,9 +7,26 @@
 #' @author Charles Dupont
 
 print.cobot <- function(x, ...) {
-  invisible(print(matrix(c(x$T1, x$T2, x$T3,
-                           sqrt(x$varT1), sqrt(x$varT2), sqrt(x$varT3),
-                           x$pvalT1, x$pvalT2, x$pvalT3),
-                         ncol=3,
-                         dimnames=list(c("Gamma(Obs) - Gamma(Exp)", "Correlation of Residuals","Covariance of Residuals"),c("est", "stderr", "p"))), ...))
+  y <- matrix(nrow=length(x$TS),ncol=5)
+  dims <- character(length(x$TS))
+  for (i in 1:length(x$TS)){
+    y[i,] <- c(x$TS[[i]]$ts, sqrt(x$TS[[i]]$var),x$TS[[i]]$pval,x$TS[[i]]$lower,x$TS[[i]]$upper)
+    dims[i] <- x$TS[[i]]$label
+  }
+  dimnames(y) <- list(dims,c('est','stderr','p','lower CI','upper CI'))
+  invisible(print(y,...))
+  cat('Fisher Transform:',x$fisher,'\n')
+  cat('Confidence Interval:',x$conf.int,'\n')
+  cat('Data Points:',x$data.points,'\n')
+  cat('Missing:',x$data.missing,'\n')
+  invisible(y)
 }
+
+#' cocobot class print method
+#' @param x cocobot object
+#' @param ... arguments passed to print.default
+#' @keywords print
+#' @export
+#' @method print cocobot
+#' @author Charles Dupont
+print.cocobot <- print.cobot
