@@ -7,16 +7,33 @@ qgumbel <- function(p, loc = 0, scale = 1, lower.tail = TRUE)
   return(q)
 }
 
+getCI <- function(ts, var, fisher, ci=0.95){
+  if(!fisher){
+    lower <- ts - abs(qnorm(0.5*(1-ci)))*sqrt(var)
+    upper <- ts + abs(qnorm(0.5*(1-ci)))*sqrt(var)  
+  } else {
+    ts_f <- log( (1+ts)/(1-ts) )
+    var_f <- var*(2/(1-ts^2))^2
+    lower_f <- ts_f - abs(qnorm(0.5*(1-ci)))*sqrt(var_f)
+    upper_f <- ts_f + abs(qnorm(0.5*(1-ci)))*sqrt(var_f)
+    lower <- (exp(lower_f)-1)/(1+exp(lower_f))
+    upper <- (exp(upper_f)-1)/(1+exp(upper_f))
+  }
+  return(c(lower, upper))
+}
 
+### no need for sandwich package now
 lm.scores = function(y, X){
   N = length(y)  
   mod = lm(y~X)
   smod = summary(mod)
+  resid = smod$residuals
   ## bread = [1/N sum (- partial phi)]^-1 
   ##       = [- 1/N  d2l. dtheta. dtheta]^-1
-  d2l.dtheta.dtheta = - solve(bread(mod))*N
-  dl.dtheta = estfun(mod)
-  resid = smod$residuals
+  #d2l.dtheta.dtheta = - solve(bread(mod))*N
+  d2l.dtheta.dtheta = -crossprod(cbind(1, X))
+  #dl.dtheta = estfun(mod)
+  dl.dtheta <- resid*cbind(1, X)
   presid = 2*pnorm((y - mod$fitted.values)/smod$sigma) -1
   dresid.dtheta = t(cbind(-1, -X))
   dpresid.dtheta = t(cbind(-2*dnorm((y - mod$fitted.values)/smod$sigma)/smod$sigma,
@@ -119,10 +136,68 @@ corTS = function(xresid, yresid,
 }
 
 
-### formula x|y ~z, x is ordinal and y is continous
+#' Conditional ordinal by ordinal tests for association.
+#'
+#' \code{cocobot} tests for independence between two ordered categorical
+#' variables, \var{X} and \var{Y} conditional on other variables,
+#' \var{Z}.  The basic approach involves fitting models of \var{X} on
+#' \var{Z} and \var{Y} on \var{Z} and determining whether there is any
+#' remaining information between \var{X} and \var{Y}.  This is done by
+#' computing one of 3 test statistics.  \code{T1} compares empirical
+#' distribution of \var{X} and \var{Y} with the joint fitted
+#' distribution of \var{X} and \var{Y} under independence conditional
+#' on \var{Z}. \code{T2} computes the correlation between ordinal
+#' (probability scale) residuals from both models and tests the null
+#' of no residual correlation.  \code{T3} evaluates the
+#' concordance--disconcordance of data drawn from the joint fitted
+#' distribution of \var{X} and \var{Y} under conditional independence
+#' with the empirical distribution. Details are given in \cite{Li C and
+#' Shepherd BE, Test of association between two ordinal variables
+#' while adjusting for covariates. Journal of the American Statistical
+#' Association 2010, 105:612-620}.
+#'
+#' formula is specified as \code{\var{X} | \var{Y} ~ \var{Z}}.
+#' This indicates that models of \code{\var{X} ~ \var{Z}} and
+#' \code{\var{Y} ~ \var{Z}} will be fit.  The null hypothsis to be
+#' tested is \eqn{H_0 : X}{H0 : X} independant of \var{Y} conditional
+#' on \var{Z}.
+#' 
+#' Note that \code{T2} can be thought of as an adjust rank
+#' correlation.(\cite{Li C and Shepherd BE, A new residual for ordinal
+#' outcomes. Biometrika 2012; 99:473-480})
+#'
+#' @param formula an object of class \code{\link{Formula}} (or one
+#'   that can be coerced to that class): a symbolic description of the
+#'   model to be fitted.  The details of model specification are given
+#'   under \sQuote{Details}.
+#' @param link The link family to be used for ordinal models of both
+#' \var{X} and \var{Y}.  Defaults to \samp{logit}. Other options are
+#' \samp{probit}, \samp{cloglog}, and \samp{cauchit}.
+#' @param data an optional data frame, list or environment (or object
+#' coercible by \code{\link{as.data.frame}} to a data frame)
+#' containing the variables in the model.  If not found in
+#' \code{data}, the variables are taken from
+#' \code{environment(formula)}, typically the environment from which
+#' \code{cobot} is called.
+#' @param subset an optional vector specifying a subset of
+#' observations to be used in the fitting process.
+#' @param na.action action to take when NA present in data.
+#' @param emp logical indicating normality or not.
+#' @param fisher logical indicating whether to apply fisher transform.
+#' @param conf.int numeric specifying confidence interval.
+#' @return object of \samp{cobot} class.
+#' @export
+#' @examples
+#' data(PResidData)
+#' cocobot(x|y~z, data=PResidData)
+#' @importFrom rms lrm
+#' @importFrom sandwich bread estfun
+
 cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit"),
-                      subset, na.action=na.fail, 
-                      emp=TRUE,fisher=FALSE) {
+                      subset, na.action=getOption('na.action'), 
+                      emp=TRUE,fisher=FALSE,conf.int=0.95) {
+
+  # Construct the model frames for x ~ z and y ~ z
   F1 <- Formula(formula)
   Fx <- formula(F1, lhs=1)
   Fy <- formula(F1, lhs=2)
@@ -143,19 +218,40 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
   
   mx <- eval(mx, parent.frame())
   my <- eval(my, parent.frame())
+
+  # TODO: test the different na.x options
+  # TODO: Only subset when na.action==na.omit
+  if (nrow(mx) != nrow(my)){
+    i_rows <- intersect(row.names(mx),row.names(my))
+    mx <- mx[row.names(mx) %in% i_rows,]
+    my <- my[row.names(my) %in% i_rows,]
+  }
+
+  # TODO: output number of data points used vs. number of missing
+
+  if (!is.factor(mx[[1]])){
+    warning("Coercing ",names(mx)[1]," to factor. Check the ordering of categories.")
+    mx[[1]] <- as.factor(mx[[1]])
+  }
+
+  # Construct the model matrix z
+  mxz <- model.matrix(attr(mx,'terms'),mx) 
+  zzint <- match("(Intercept)", colnames(mxz), nomatch = 0L)
+  if(zzint > 0L) {
+    mxz <- mxz[, -zzint, drop = FALSE]
+  }
+
+  myz <- model.matrix(attr(my,'terms'),my) 
+  zzint <- match("(Intercept)", colnames(myz), nomatch = 0L)
+  if(zzint > 0L) {
+    myz <- myz[, -zzint, drop = FALSE]
+  }
   
-  score.xz <- ordinal.scores(mx, method=link)
-  score.yz <- lm.scores(y=model.response(my), X=as.matrix(my[,2:ncol(my)]))
+  score.xz <- ordinal.scores(mx, mxz, method=link)
+  score.yz <- lm.scores(y=model.response(my), X=myz)
   
   npar.xz = dim(score.xz$dl.dtheta)[2]
   npar.yz = dim(score.yz$dl.dtheta)[2]
-  
-  Terms <- attr(mx, "terms")
-  zz <- model.matrix(Terms, mx, contrasts)
-  zzint <- match("(Intercept)", colnames(zz), nomatch = 0L)
-  if(zzint > 0L) {
-    zz <- zz[, -zzint, drop = FALSE]
-  }
   
   xx = as.integer(model.response(mx))
 
@@ -172,6 +268,7 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
   ## return value
   ans <- list(TS=list(),fisher=fisher)
 
+  # TODO: add confidence intervals
   ### presid vs obs-exp
   ta <-  corTS(xz.presid, score.yz$resid,
                 score.xz$dl.dtheta, score.yz$dl.dtheta,
@@ -217,7 +314,10 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
   for (i in 1:N){
     tmp <- try(integrate(G.inverse, rij_1[i], rij[i])$value/pij[i],silent=TRUE)
     if (inherits(tmp,'try-error')){
-      warning("Cannot compute something")
+      if (link[1] != 'cauchit')
+        warning("Cannot compute latent variable residual.")
+      else
+        warning("Cannot compute latent variable residual with link function cauchit.")
       inverse_fail <- TRUE
       break
     } else {

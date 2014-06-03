@@ -15,11 +15,11 @@ Imports:
 License: GPL (>= 2)
 Collate:
     'GKGamma.R'
-    'diagn.R'
-    'newPolr.R'
-    'pgumbel.R'
-    'cobot.R'
-    'print.cobot.R'
-    'cocobot.R'
-    'print.cocobot.R'
     'PResiduals-package.R'
+    'pgumbel.R'
+    'newPolr.R'
+    'diagn.R'
+    'cobot.R'
+    'cocobot.R'
+    'print.cobot.R'
+    'print.cocobot.R'

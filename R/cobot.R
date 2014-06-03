@@ -237,11 +237,11 @@ ordinal.scores.logit = function(y, X) {
        dhi.dtheta=dhi.dtheta)
 }
 
-ordinal.scores <- function(mf, method) {
+ordinal.scores <- function(mf, mm, method) {
   ## mf is the model.frame of the data
 
   if (method[1]=='logit'){
-    return(ordinal.scores.logit(y=as.numeric(model.response(mf)),X=as.matrix(mf[,2:ncol(mf)])))
+    return(ordinal.scores.logit(y=as.numeric(model.response(mf)),X=mm))
   }
 
   ## Fit proportional odds model and obtain the MLEs of parameters.
@@ -255,17 +255,10 @@ ordinal.scores <- function(mf, method) {
   ## na, nb: number of parameters in alpha and beta
   na = ny - 1
 
-  Terms <- attr(mf, "terms")
-  x <- model.matrix(Terms, mf, contrasts)
-  xint <- match("(Intercept)", colnames(x), nomatch = 0L)
+  x <- mm
 
   nb = ncol(x)
 
-  if(xint > 0L) {
-    x <- x[, -xint, drop = FALSE]
-    nb <- nb - 1L
-  }
-  
   npar = na + nb
 
   alpha = mod$zeta
@@ -388,7 +381,7 @@ ordinal.scores <- function(mf, method) {
 cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
                   link.x=link,
                   link.y=link,
-                  data, subset, na.action=na.fail,fisher=FALSE) {
+                  data, subset, na.action=na.fail,fisher=FALSE,conf.int=0.95) {
   F1 <- Formula(formula)
   Fx <- formula(F1, lhs=1)
   Fy <- formula(F1, lhs=2)
@@ -410,18 +403,19 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   mx <- eval(mx, parent.frame())
   my <- eval(my, parent.frame())
 
-  score.xz <- ordinal.scores(mx, method=link.x)
-  score.yz <- ordinal.scores(my, method=link.y)
-
-  npar.xz = dim(score.xz$dl.dtheta)[2]
-  npar.yz = dim(score.yz$dl.dtheta)[2]
-
   Terms <- attr(mx, "terms")
   zz <- model.matrix(Terms, mx, contrasts)
   zzint <- match("(Intercept)", colnames(zz), nomatch = 0L)
   if(zzint > 0L) {
     zz <- zz[, -zzint, drop = FALSE]
   }
+
+  score.xz <- ordinal.scores(mx, zz, method=link.x)
+  score.yz <- ordinal.scores(my, zz, method=link.y)
+
+  npar.xz = dim(score.xz$dl.dtheta)[2]
+  npar.yz = dim(score.yz$dl.dtheta)[2]
+
 
   xx = as.integer(model.response(mx)); yy = as.integer(model.response(my))
   nx = length(table(xx))
@@ -717,5 +711,5 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   varT1 = sum(SS^2)
   pvalT1 = 2 * pnorm(-abs(T1)/sqrt(varT1))
 
-  structure(list(T1=T1, varT1=varT1, pvalT1=pvalT1, T2=T2, varT2=varT2, pvalT2=pvalT2, T3=T3, varT3=varT3, pvalT3=pvalT3), class="cobot")
+  structure(list(T1=T1, varT1=varT1, pvalT1=pvalT1, T2=T2, varT2=varT2, pvalT2=pvalT2, T3=T3, varT3=varT3, pvalT3=pvalT3,fisher=fisher), class="cobot")
 }
