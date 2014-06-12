@@ -408,16 +408,10 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   my[[xName]] <- Fx[[2]]
 
   mx <- eval(mx, parent.frame())
-  mxAttrs <- attributes(mx)
-  mx <- mx[,!names(mx) %in% paste('(',yName,')',sep='')]
-  mxAttrs$names <- names(mx)
-  attributes(mx) <- mxAttrs
+  mx[[paste('(',yName,')',sep='')]] <- NULL
   
   my <- eval(my, parent.frame())
-  myAttrs <- attributes(my)
-  my <- my[,!names(my) %in% paste('(',xName,')',sep='')]
-  myAttrs$names <- names(my)
-  attributes(my) <- myAttrs
+  my[[paste('(',xName,')',sep='')]] <- NULL
 
   data.points <- nrow(mx)
 
