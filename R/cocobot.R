@@ -212,23 +212,30 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
   
   
   mx <- my <- mf
-  
+
+  # NOTE: we add the opposite variable to each model frame call so that
+  # subsetting occurs correctly. Later we strip them off.
   mx[["formula"]] <- Fx
+  yName <- all.vars(Fy[[2]])[1]
+  mx[[yName]] <- Fy[[2]]
+
   my[["formula"]] <- Fy
-  
+  xName <- all.vars(Fx[[2]])[1]
+  my[[xName]] <- Fx[[2]]
+
   mx <- eval(mx, parent.frame())
+  mxAttrs <- attributes(mx)
+  mx <- mx[,!names(mx) %in% paste('(',yName,')',sep='')]
+  mxAttrs$names <- names(mx)
+  attributes(mx) <- mxAttrs
+  
   my <- eval(my, parent.frame())
+  myAttrs <- attributes(my)
+  my <- my[,!names(my) %in% paste('(',xName,')',sep='')]
+  myAttrs$names <- names(my)
+  attributes(my) <- myAttrs
 
-  # TODO: test the different na.x options
-  # TODO: Only subset when na.action==na.omit
-  if (nrow(mx) != nrow(my)){
-    i_rows <- intersect(row.names(mx),row.names(my))
-    mx <- mx[row.names(mx) %in% i_rows,]
-    my <- my[row.names(my) %in% i_rows,]
-  }
   data.points <- nrow(mx)
-
-  # TODO: output number of data points used vs. number of missing
 
   if (!is.factor(mx[[1]])){
     warning("Coercing ",names(mx)[1]," to factor. Check the ordering of categories.")

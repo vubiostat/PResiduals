@@ -397,22 +397,28 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
 
   mx <- my <- mf
 
+  # NOTE: we add the opposite variable to each model frame call so that
+  # subsetting occurs correctly. Later we strip them off.
   mx[["formula"]] <- Fx
+  yName <- all.vars(Fy[[2]])[1]
+  mx[[yName]] <- Fy[[2]]
+
   my[["formula"]] <- Fy
+  xName <- all.vars(Fx[[2]])[1]
+  my[[xName]] <- Fx[[2]]
 
   mx <- eval(mx, parent.frame())
+  mxAttrs <- attributes(mx)
+  mx <- mx[,!names(mx) %in% paste('(',yName,')',sep='')]
+  mxAttrs$names <- names(mx)
+  attributes(mx) <- mxAttrs
+  
   my <- eval(my, parent.frame())
+  myAttrs <- attributes(my)
+  my <- my[,!names(my) %in% paste('(',xName,')',sep='')]
+  myAttrs$names <- names(my)
+  attributes(my) <- myAttrs
 
-  # TODO: pin down exactly how to merge mx and my, possibly with extra arguments to model.frame
-  # don't use nrow() != nrow() since they could have the same number of missing
-  # same for cocobot
-  if (nrow(mx) != nrow(my)){
-    stop("Lengths differ ",nrow(mx)," ",nrow(my))
-    n <- max(nrow(mx),nrow(my))
-    i_rows <- intersect(row.names(mx),row.names(my))
-    mx <- mx[row.names(mx) %in% i_rows,]
-    my <- my[row.names(my) %in% i_rows,]
-  }
   data.points <- nrow(mx)
 
   Terms <- attr(mx, "terms")
