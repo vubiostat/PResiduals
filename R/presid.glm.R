@@ -1,4 +1,5 @@
 ###glm()
+#' @export
 presid.glm <- function(mod, ...) {
     ##gaussian.emp = (2 * rank(residuals(mod))-1-length(y))/length(y)  #need to figure out how to incorporate this in this function
     switch(mod$family$family ,
@@ -9,6 +10,7 @@ presid.glm <- function(mod, ...) {
 }
 
 ###lm()
+#' @export
 presid.lm <- function(mod, ...) {
   presid = 2 * pnorm((model.response(mod$model) - mod$fitted.values)/summary(mod)$sigma) - 1
   ##presid.emp = (2 * rank(residuals(mod))-1-length(y))/length(y)
@@ -17,12 +19,14 @@ presid.lm <- function(mod, ...) {
 }
 
 ###negative binomial
-presid.nb <- function(mod, ...) {
+#' @export
+presid.negbin <- function(mod, ...) {
   pnbinom(mod$y-1, mu=mod$fitted.values, size=mod$theta ) + pnbinom(mod$y, mu=mod$fitted.values, size=mod$theta) -1
 }
 
 
 ###polr
+#' @export
 presid.polr <- function(mod, ...) {
     pfun <- switch(mod$method,
                    logistic = plogis,
@@ -40,6 +44,7 @@ presid.polr <- function(mod, ...) {
 }
 
 ###coxph()
+#' @export
 presid.coxph <- function(mod, ...) {
     time <- mod$y[,1]
     delta <- mod$y[,2]
@@ -49,6 +54,7 @@ presid.coxph <- function(mod, ...) {
 
 
 ###survreg()
+#' @export
 presid.survreg <- function(mod, ...){
     time <- mod$y[,1]
     delta <- mod$y[,2]
@@ -74,7 +80,7 @@ presid.survreg <- function(mod, ...){
            stop("Unhandled dist", mod$dist))
 }
 
-
+#' @export
 presid.default <- function(mod, ...) {
     stop("Unhandeled model type")
 }
@@ -101,6 +107,7 @@ presid.default <- function(mod, ...) {
 #' @export
 #' @examples
 #' library(survival)
+#' library(stats)
 #' 
 #' set.seed(100)
 #' time <- sample(1:60, size=100, replace=TRUE)
