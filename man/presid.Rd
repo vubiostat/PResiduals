@@ -3,19 +3,21 @@
 \alias{presid}
 \title{Probability-scale Residual}
 \usage{
-presid(mod, ...)
+presid(object, ...)
 }
 \arguments{
-\item{mod}{The model object for which the probability-scale residual is calculated}
+\item{object}{The model object for which the probability-scale residual is calculated}
 
-\item{...}{Aditional arguements passed to methods}
+\item{...}{Additional arguements passed to methods}
 }
 \value{
-The probablity scale residual for the model
+The probability scale residual for the model
 }
 \description{
-\code{presid} Calculates the probability-scale residual for various model types.
-probability-scale residual is \eqn{P(Y* > y) - P(Y* < y)} where \eqn{y} is the observed
+\code{presid} Calculates the probability-scale residual for various model function objects.
+}
+\details{
+Probability-scale residual is \eqn{P(Y* < y) - P(Y* > y)} where \eqn{y} is the observed
 outcome and \eqn{Y*} is a random variable from the fitted distribution.
 }
 \examples{
@@ -57,10 +59,10 @@ Chun Li \email{chun.li@vanderbilt.edu}
 Bryan Shepherd \email{bryan.shepherd@vanderbilt.edu}
 }
 \references{
+Shepherd BE, Li C, Liu Q.  Probability-scale residuals for continuous,
+discrete, and censored data.  Submitted.
+
 Li C and Shepherd BE, A new residual for ordinal
 outcomes. Biometrika 2012; 99:473-480
-
-Shepherd BE, Li C, Lin Q.  Probability-scale residuals for continuous,
-discrete, and censored data.  Submitted.
 }
 
