@@ -80,25 +80,27 @@ presid.default <- function(mod, ...) {
 }
 
 
-#' Probablity Scale Residual
+#' Probability-scale Residual
 #'
-#' \code{presid} calculates the probablity scale residual for various model types
+#' \code{presid} Calculates the probability-scale residual for various model types.
+#' probability-scale residual is \exp{P(Y* > y) - P(Y* < y)} where \exp{y} is the observed
+#' outcome and \exp{Y*} is a random variable from the fitted distribution.
 #'
-#' @param mod The model object for which the probality scale residual is calculated
+#' @param mod The model object for which the probability-scale residual is calculated
 #' @param ... Aditional arguements passed to methods
 #' @return The probablity scale residual for the model
 #' @references Li C and Shepherd BE, A new residual for ordinal
 #' outcomes. Biometrika 2012; 99:473-480
+#' @references Shepherd BE, Li C, Lin Q.  Probability-scale residuals for continuous,
+#' discrete, and censored data.  Submitted.
 #' @author Charles Dupont \email{charles.dupont@@vanderbilt.edu}
 #' @author Chun Li \email{chun.li@@vanderbilt.edu}
 #' @author Bryan Shepherd \email{bryan.shepherd@@vanderbilt.edu}
-#' @author Valintine Wanga \email{?}
 #' @importFrom actuar pllogis
 #' @importFrom stats plnorm pnorm pexp pweibull plogis pnbinom
 #' @export
 #' @examples
 #' library(survival)
-#' library(actuar) #for getting the cdf of loglogistic cdf 
 #' 
 #' set.seed(100)
 #' time <- sample(1:60, size=100, replace=TRUE)
@@ -106,11 +108,11 @@ presid.default <- function(mod, ...) {
 #' X <- round(rnorm(100, mean=36, sd=7), 0)
 #'
 #' mod <- survreg(Surv(time, delta) ~ X, dist="weibull")
-#' summary(presid.survreg(mod))
+#' summary(presid(mod))
 #'
 #' #Example for coxph
 #' mod <- coxph(Surv(time, delta) ~ X)
-#' summary(presid.coxph(mod))
+#' summary(presid(mod))
 #' ##################
 #'
 #'
@@ -125,7 +127,7 @@ presid.default <- function(mod, ...) {
 #' y <- rnbinom(n, mu=exp(mu), size=phi)
 #'
 #' mod <- glm.nb(y ~ X)
-#' summary(presid.nb(mod))
+#' summary(presid(mod))
 presid <- function(mod, ...) {
     UseMethod('presid', mod)
 }
