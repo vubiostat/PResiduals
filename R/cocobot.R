@@ -236,6 +236,10 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
     mx[[1]] <- as.factor(mx[[1]])
   }
 
+  if (is.factor(my[[1]])){
+    stop(names(my)[1]," cannot be a factor.")
+  }
+
   # Construct the model matrix z
   mxz <- model.matrix(attr(mx,'terms'),mx) 
   zzint <- match("(Intercept)", colnames(mxz), nomatch = 0L)
