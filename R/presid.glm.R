@@ -89,8 +89,8 @@ presid.default <- function(mod, ...) {
 #' Probability-scale Residual
 #'
 #' \code{presid} Calculates the probability-scale residual for various model types.
-#' probability-scale residual is \exp{P(Y* > y) - P(Y* < y)} where \exp{y} is the observed
-#' outcome and \exp{Y*} is a random variable from the fitted distribution.
+#' probability-scale residual is \eqn{P(Y* > y) - P(Y* < y)} where \eqn{y} is the observed
+#' outcome and \eqn{Y*} is a random variable from the fitted distribution.
 #'
 #' @param mod The model object for which the probability-scale residual is calculated
 #' @param ... Aditional arguements passed to methods

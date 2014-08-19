@@ -15,11 +15,12 @@ The probablity scale residual for the model
 }
 \description{
 \code{presid} Calculates the probability-scale residual for various model types.
-probability-scale residual is \exp{P(Y* > y) - P(Y* < y)} where \exp{y} is the observed
-outcome and \exp{Y*} is a random variable from the fitted distribution.
+probability-scale residual is \eqn{P(Y* > y) - P(Y* < y)} where \eqn{y} is the observed
+outcome and \eqn{Y*} is a random variable from the fitted distribution.
 }
 \examples{
 library(survival)
+library(stats)
 
 set.seed(100)
 time <- sample(1:60, size=100, replace=TRUE)
