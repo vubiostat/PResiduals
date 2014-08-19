@@ -5,7 +5,7 @@ presid.glm <- function(object, emp=FALSE, ...) {
     switch(object$family$family ,
            poisson = 2 * ppois(object$y, object$fitted.values) - dpois(object$y, object$fitted.values) - 1,
            binomial = object$y - object$fitted.values,
-           gaussian = if(emp) (2 * rank(residuals(object)) - 1 - length(y)) / length(y) else 2 * pnorm((object$y - object$fitted.values)/sqrt(summary(object)$dispersion)) - 1,
+           gaussian = if(emp) (2 * rank(residuals(object)) - 1 - length(object$y)) / length(object$y) else 2 * pnorm((object$y - object$fitted.values)/sqrt(summary(object)$dispersion)) - 1,
            stop("Unhandled family", object$family$family))
 }
 
