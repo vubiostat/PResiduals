@@ -18,7 +18,7 @@ presid.lm <- function(mod, ...) {
 
 ###negative binomial
 presid.nb <- function(mod, ...) {
-  pnbinom(y-1, mu=mod$fitted.values, size=mod$theta ) + pnbinom(y, mu=mod$fitted.values, size=mod$theta) -1
+  pnbinom(mod$y-1, mu=mod$fitted.values, size=mod$theta ) + pnbinom(mod$y, mu=mod$fitted.values, size=mod$theta) -1
 }
 
 
@@ -27,8 +27,8 @@ presid.polr <- function(mod, ...) {
     pfun <- switch(mod$method,
                    logistic = plogis,
                    probit = pnorm, 
-                   loglog = MASS:::pgumbel,
-                   cloglog = MASS:::pGumbel,
+                   loglog = pgumbel,
+                   cloglog = pGumbel,
                    cauchit = pcauchy)
     n <- length(mod$lp)
     q <- length(mod$zeta)
@@ -71,7 +71,7 @@ presid.survreg <- function(mod, ...){
          
            lognormal = plnorm(time, meanlog=mod$linear.predictors, sdlog=summary(mod)$scale, lower.tail=TRUE, log.p=FALSE)
            + delta*(plnorm(time, meanlog=mod$linear.predictors, sdlog=summary(mod)$scale, lower.tail=TRUE, log.p=FALSE) - 1),
-           stop("Unhandled dist", x$dist))
+           stop("Unhandled dist", mod$dist))
 }
 
 
@@ -93,9 +93,8 @@ presid.default <- function(mod, ...) {
 #' @author Chun Li \email{chun.li@@vanderbilt.edu}
 #' @author Bryan Shepherd \email{bryan.shepherd@@vanderbilt.edu}
 #' @author Valintine Wanga \email{?}
-#' @import MASS
-#' @import actuar
-#' @import survival
+#' @importFrom actuar pllogis
+#' @importFrom stats plnorm pnorm pexp pweibull plogis pnbinom
 #' @export
 #' @examples
 #' library(survival)

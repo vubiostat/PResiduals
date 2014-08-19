@@ -11,7 +11,8 @@ Description: Computes probability scale residuals and residual correlations
 Imports:
     Formula,
     rms,
-    sandwich
+    sandwich,
+    actuar
 License: GPL (>= 2)
 Collate:
     'GKGamma.R'
@@ -21,5 +22,6 @@ Collate:
     'diagn.R'
     'cobot.R'
     'cocobot.R'
+    'presid.glm.R'
     'print.cobot.R'
     'print.cocobot.R'
