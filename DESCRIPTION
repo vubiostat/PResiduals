@@ -22,6 +22,6 @@ Collate:
     'diagn.R'
     'cobot.R'
     'cocobot.R'
-    'presid.glm.R'
+    'presid.R'
     'print.cobot.R'
     'print.cocobot.R'

@@ -13,7 +13,7 @@ that can be coerced to that class): a symbolic description of the
 model to be fitted.  The details of model specification are given
 under \sQuote{Details}.}
 
-\item{link}{The link family to be used for the ordinal model of 
+\item{link}{The link family to be used for the ordinal model of
 \var{X} on \var{Z}.  Defaults to \samp{logit}. Other options are
 \samp{probit}, \samp{cloglog}, and \samp{cauchit}.}
 
@@ -30,7 +30,7 @@ observations to be used in the fitting process.}
 \item{na.action}{action to take when NA present in data.}
 
 \item{emp}{logical indicating whether the residuals from the model of
-\var{Y} on \var{Z} are computed based on the assumption of normality (FALSE) 
+\var{Y} on \var{Z} are computed based on the assumption of normality (FALSE)
 or empirically (FALSE).}
 
 \item{fisher}{logical indicating whether to apply fisher transformation to compute confidence intervals and p-values for the correlation.}
@@ -46,24 +46,31 @@ variable, \var{X}, and a continuous variable, \var{Y}, conditional on other vari
 \var{Z}.  The basic approach involves fitting an ordinal model of \var{X} on
 \var{Z}, a linear model of \var{Y} on \var{Z}, and then determining whether there is any
 residual information between \var{X} and \var{Y}.  This is done by
-computing residuals for both models, calculating their correlation, and 
-testing the null of no residual correlation.  This procedure is analogous to test statistic 
+computing residuals for both models, calculating their correlation, and
+testing the null of no residual correlation.  This procedure is analogous to test statistic
 \code{T2} in \code{cobot}.  Two test statistics (correlations) are currently output.  The first
-is the correlation between probability-scale residuals. The second is the correlation between 
+is the correlation between probability-scale residuals (PResid). The second is the correlation between
 the observed-minus-expected residual for the continuous outcome model and a latent variable residual
-for the ordinal model.  Details are given in \cite{Li C and Shepherd BE (2012). A new residual for ordinal outcomes. {\it Biometrika}. 99: 473--480.} and 
-\cite{Shepherd BE, Li C, Liu Q (submitted). Probability-scale residuals for continuous, discrete, and censored data.}
+for the ordinal model.
 }
 \details{
-formula is specified as \code{\var{X} | \var{Y} ~ \var{Z}}.
+Formula is specified as \code{\var{X} | \var{Y} ~ \var{Z}}.
 This indicates that models of \code{\var{X} ~ \var{Z}} and
 \code{\var{Y} ~ \var{Z}} will be fit.  The null hypothsis to be
 tested is \eqn{H_0 : X}{H0 : X} independant of \var{Y} conditional
-on \var{Z}.
+on \var{Z}.  The ordinal variable, \code{\var{X}}, must precede the \code{|} and be a factor variable, and \code{\var{Y}} must be continuous.
+}
+\section{References}{
 
+Li C and Shepherd BE (2012)
+A new residual for ordinal outcomes.
+\emph{Biometrika}. \bold{99}: 473--480.
+
+Shepherd BE, Li C, Liu Q (submitted)
+Probability-scale residuals for continuous, discrete, and censored data.
 }
 \examples{
 data(PResidData)
-cocobot(x|y~z, data=PResidData)
+cocobot(w|y~z, data=PResidData)
 }
 

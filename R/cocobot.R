@@ -136,60 +136,69 @@ corTS = function(xresid, yresid,
 }
 
 
-#' Conditional ordinal by ordinal tests for association.
-#'
-#' \code{cocobot} tests for independence between two ordered categorical
-#' variables, \var{X} and \var{Y} conditional on other variables,
-#' \var{Z}.  The basic approach involves fitting models of \var{X} on
-#' \var{Z} and \var{Y} on \var{Z} and determining whether there is any
-#' remaining information between \var{X} and \var{Y}.  This is done by
-#' computing one of 3 test statistics.  \code{T1} compares empirical
-#' distribution of \var{X} and \var{Y} with the joint fitted
-#' distribution of \var{X} and \var{Y} under independence conditional
-#' on \var{Z}. \code{T2} computes the correlation between ordinal
-#' (probability scale) residuals from both models and tests the null
-#' of no residual correlation.  \code{T3} evaluates the
-#' concordance--disconcordance of data drawn from the joint fitted
-#' distribution of \var{X} and \var{Y} under conditional independence
-#' with the empirical distribution. Details are given in \cite{Li C and
-#' Shepherd BE, Test of association between two ordinal variables
-#' while adjusting for covariates. Journal of the American Statistical
-#' Association 2010, 105:612-620}.
-#'
-#' formula is specified as \code{\var{X} | \var{Y} ~ \var{Z}}.
+#'  Conditional continuous by ordinal tests for association.
+#' 
+#' \code{cocobot} tests for independence between an ordered categorical
+#' variable, \var{X}, and a continuous variable, \var{Y}, conditional on other variables,
+#' \var{Z}.  The basic approach involves fitting an ordinal model of \var{X} on
+#' \var{Z}, a linear model of \var{Y} on \var{Z}, and then determining whether there is any
+#' residual information between \var{X} and \var{Y}.  This is done by
+#' computing residuals for both models, calculating their correlation, and 
+#' testing the null of no residual correlation.  This procedure is analogous to test statistic 
+#' \code{T2} in \code{cobot}.  Two test statistics (correlations) are currently output.  The first
+#' is the correlation between probability-scale residuals (PResid). The second is the correlation between 
+#' the observed-minus-expected residual for the continuous outcome model and a latent variable residual
+#' for the ordinal model.
+#' 
+#' Formula is specified as \code{\var{X} | \var{Y} ~ \var{Z}}.
 #' This indicates that models of \code{\var{X} ~ \var{Z}} and
 #' \code{\var{Y} ~ \var{Z}} will be fit.  The null hypothsis to be
 #' tested is \eqn{H_0 : X}{H0 : X} independant of \var{Y} conditional
-#' on \var{Z}.
+#' on \var{Z}.  The ordinal variable, \code{\var{X}}, must precede the \code{|} and be a factor variable, and \code{\var{Y}} must be continuous.
+#'  
+#' @section References:
+#' Li C and Shepherd BE (2012) 
+#' A new residual for ordinal outcomes.
+#' \emph{Biometrika}. \bold{99}: 473--480.
 #' 
-#' Note that \code{T2} can be thought of as an adjust rank
-#' correlation.(\cite{Li C and Shepherd BE, A new residual for ordinal
-#' outcomes. Biometrika 2012; 99:473-480})
+#' Shepherd BE, Li C, Liu Q (submitted)
+#' Probability-scale residuals for continuous, discrete, and censored data.
 #'
+
 #' @param formula an object of class \code{\link{Formula}} (or one
-#'   that can be coerced to that class): a symbolic description of the
-#'   model to be fitted.  The details of model specification are given
-#'   under \sQuote{Details}.
-#' @param link The link family to be used for ordinal models of both
-#' \var{X} and \var{Y}.  Defaults to \samp{logit}. Other options are
+#' that can be coerced to that class): a symbolic description of the
+#' model to be fitted.  The details of model specification are given
+#' under \sQuote{Details}.
+#' 
+#' @param link The link family to be used for the ordinal model of 
+#' \var{X} on \var{Z}.  Defaults to \samp{logit}. Other options are
 #' \samp{probit}, \samp{cloglog}, and \samp{cauchit}.
+#' 
 #' @param data an optional data frame, list or environment (or object
 #' coercible by \code{\link{as.data.frame}} to a data frame)
 #' containing the variables in the model.  If not found in
 #' \code{data}, the variables are taken from
 #' \code{environment(formula)}, typically the environment from which
-#' \code{cobot} is called.
+#' \code{cocobot} is called.
+#' 
 #' @param subset an optional vector specifying a subset of
 #' observations to be used in the fitting process.
+#' 
 #' @param na.action action to take when NA present in data.
-#' @param emp logical indicating normality or not.
-#' @param fisher logical indicating whether to apply fisher transform.
-#' @param conf.int numeric specifying confidence interval.
-#' @return object of \samp{cobot} class.
+#' 
+#' @param emp logical indicating whether the residuals from the model of
+#' \var{Y} on \var{Z} are computed based on the assumption of normality (FALSE) 
+#' or empirically (FALSE).
+#' 
+#' @param fisher logical indicating whether to apply fisher transformation to compute confidence intervals and p-values for the correlation.
+#' 
+#' @param conf.int numeric specifying confidence interval coverage.
+#' 
+#' @return object of \samp{cocobot} class.
 #' @export
 #' @examples
 #' data(PResidData)
-#' cocobot(x|y~z, data=PResidData)
+#' cocobot(w|y~z, data=PResidData)
 #' @importFrom rms lrm
 #' @importFrom sandwich bread estfun
 
@@ -280,15 +289,15 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
          )
 
   ### presid vs obs-exp
-  ta <-  corTS(xz.presid, score.yz$resid,
-                score.xz$dl.dtheta, score.yz$dl.dtheta,
-                score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
-                xz.dpresid.dtheta, score.yz$dresid.dtheta, fisher)
-  ans$TS$TA <- 
-      list( 
-        ts=ta$TS, var=ta$var.TS, pval=ta$pval.TS,
-        label='PResid vs. Obs-Exp'
-      )
+  #ta <-  corTS(xz.presid, score.yz$resid,
+  #              score.xz$dl.dtheta, score.yz$dl.dtheta,
+  #              score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+  #              xz.dpresid.dtheta, score.yz$dresid.dtheta, fisher)
+  #ans$TS$TA <- 
+  #    list( 
+  #      ts=ta$TS, var=ta$var.TS, pval=ta$pval.TS,
+  #      label='PResid vs. Obs-Exp'
+  #    )
   
   if (emp==TRUE){
     ### presid vs presid (emprical)
@@ -367,27 +376,27 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
           label = 'Latent.resid vs. Obs-Exp'
         )
     
-    if (emp==TRUE){
-      ### latent vs presid (emprical)
-      td = corTS(xz.latent.resid, score.yz$presid.k,
-                  score.xz$dl.dtheta, score.yz$dl.dtheta,
-                  score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
-                  xz.dlatent.dtheta, score.yz$dpresid.dtheta.k,fisher)
-      td.label = "Latent.resid  vs. PResid (empirical)"
-    } else {
-      ### latent vs presid (use pdf of normal)
-      td = corTS(xz.latent.resid, score.yz$presid,
-                  score.xz$dl.dtheta, score.yz$dl.dtheta,
-                  score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
-                  xz.dlatent.dtheta, score.yz$dpresid.dtheta,fisher)
-      td.label = "Latent.resid  vs. PResid (assume normality)"
-      
-    }
-    ans$TS$TD <- 
-        list( 
-          ts=td$TS, var=td$var.TS, pval=td$pval.TS,
-          label = td.label
-        )
+    #if (emp==TRUE){
+    #  ### latent vs presid (emprical)
+    #  td = corTS(xz.latent.resid, score.yz$presid.k,
+    #              score.xz$dl.dtheta, score.yz$dl.dtheta,
+    #              score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+    #              xz.dlatent.dtheta, score.yz$dpresid.dtheta.k,fisher)
+    #  td.label = "Latent.resid  vs. PResid (empirical)"
+    #} else {
+    #  ### latent vs presid (use pdf of normal)
+    #  td = corTS(xz.latent.resid, score.yz$presid,
+    #              score.xz$dl.dtheta, score.yz$dl.dtheta,
+    #              score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
+    #              xz.dlatent.dtheta, score.yz$dpresid.dtheta,fisher)
+    #  td.label = "Latent.resid  vs. PResid (assume normality)"
+    #  
+    #}
+    #ans$TS$TD <- 
+    #    list( 
+    #      ts=td$TS, var=td$var.TS, pval=td$pval.TS,
+    #      label = td.label
+    #    )
   }
   
   ans <- structure(ans, class="cocobot")
