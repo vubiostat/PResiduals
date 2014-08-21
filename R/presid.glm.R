@@ -62,23 +62,46 @@ presid.survreg <- function(object, ...){
     delta <- object$y[,2]
     
     switch(object$dist,
-           weibull = pweibull(time, shape=1/summary(object)$scale, scale=exp(object$linear.predictors), lower.tail=TRUE, log.p=FALSE)
-           + delta*(pweibull(time, shape=1/summary(object)$scale, scale=exp(object$linear.predictors), lower.tail=TRUE, log.p=FALSE) - 1),
+           weibull = {
+               prob <- pweibull(exp(time), shape=1/summary(object)$scale,
+                                scale=exp(object$linear.predictors),
+                                lower.tail=TRUE, log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
            
-           exponential = pexp(time, rate=1/exp(object$linear.predictors), lower.tail=TRUE, log.p=FALSE)
-           + delta*(pexp(time, rate=1/exp(object$linear.predictors), lower.tail=TRUE, log.p=FALSE) - 1),
+           exponential = {
+               prob <- pexp(time, rate=1/exp(object$linear.predictors),
+                            lower.tail=TRUE, log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
            
-           gaussian = pnorm(time, mean=object$linear.predictors, sd=summary(object)$scale, lower.tail=TRUE, log.p=FALSE)
-           + delta*(pnorm(time, mean=object$linear.predictors, sd=summary(object)$scale, lower.tail=TRUE, log.p=FALSE) - 1),
+           gaussian = {
+               prob <- pnorm(time, mean=object$linear.predictors,
+                             sd=summary(object)$scale, lower.tail=TRUE,
+                             log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
            
-           logistic = plogis(time, location=object$linear.predictors, scale=summary(object)$scale, lower.tail=TRUE, log.p=FALSE)
-           + delta*(plogis(time, location=object$linear.predictors, scale=summary(object)$scale, lower.tail=TRUE, log.p=FALSE) - 1),
+           logistic = {
+               prob <- plogis(time, location=object$linear.predictors,
+                              scale=summary(object)$scale, lower.tail=TRUE,
+                              log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
          
-           loglogistic = pllogis(time, shape=summary(object)$scale, scale=exp(object$linear.predictors), lower.tail=TRUE, log.p=FALSE)
-           + delta*(pllogis(time, shape=summary(object)$scale, scale=exp(object$linear.predictors), lower.tail=TRUE, log.p=FALSE) - 1),
+           ## loglogistic = {
+           ##     prob <- pllogis(time, shape=summary(object)$scale,
+           ##                     scale=exp(object$linear.predictors),
+           ##                     lower.tail=TRUE, log.p=FALSE)
+           ##     prob + delta*(prob - 1)
+           ## },
          
-           lognormal = plnorm(time, meanlog=object$linear.predictors, sdlog=summary(object)$scale, lower.tail=TRUE, log.p=FALSE)
-           + delta*(plnorm(time, meanlog=object$linear.predictors, sdlog=summary(object)$scale, lower.tail=TRUE, log.p=FALSE) - 1),
+           lognormal = {
+               prob <- plnorm(time, meanlog=object$linear.predictors,
+                              sdlog=summary(object)$scale, lower.tail=TRUE,
+                              log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
            stop("Unhandled dist", object$dist))
 }
 
@@ -90,7 +113,13 @@ presid.default <- function(object, ...) {
 
 #' Probability-scale Residual
 #'
-#' \code{presid} Calculates the probability-scale residual for various model function objects.
+#' \code{presid} Calculates the probability-scale residual for various model
+#' function objects. Currently supported models include \code{\link{glm}}
+#' (Poisson, binomial, and gaussian families), \code{\link{lm}} in the
+#' \pkg{stats} library, \code{\link{survreg}} (Weibull, exponential, gaussian,
+#' logistic, and lognormal distributions) and \code{\link{coxph}} in the
+#' \pkg{survival} library, and \code{\link{polr}} and \code{\link{glm.nb}} in
+#' the \pkg{MASS} library.
 #' 
 #' Probability-scale residual is \eqn{P(Y* < y) - P(Y* > y)} where \eqn{y} is the observed
 #' outcome and \eqn{Y*} is a random variable from the fitted distribution.
@@ -106,25 +135,31 @@ presid.default <- function(object, ...) {
 #' @author Chun Li \email{chun.li@@vanderbilt.edu}
 #' @author Bryan Shepherd \email{bryan.shepherd@@vanderbilt.edu}
 #' @importFrom actuar pllogis
-#' @importFrom stats plnorm pnorm pexp pweibull plogis pnbinom
+#' @importFrom stats plnorm pnorm pexp pweibull plogis pnbinom pcauchy
 #' @export
 #' @examples
 #' library(survival)
 #' library(stats)
 #' 
 #' set.seed(100)
-#' time <- sample(1:60, size=100, replace=TRUE)
-#' delta <- sample(c(0,1), size=100, prob=c(0.2,0.8), replace=TRUE)
+#' n <- 1000
+#' x <- rnorm(n)
+#' t <- rweibull(n, shape=1/3, scale=exp(x))
+#' c <- rexp(n, 1/3)
+#' y <- pmin(t, c)
+#' d <- ifelse(t<=c, 1, 0)
+#'
+#' mod.survreg <- survreg(Surv(y, d) ~ x, dist="weibull")
+#' summary(presid(mod.survreg))
+#' plot(x, presid(mod.survreg))
+#' 
+#' #Example for coxph
+#' time <- sample(60, size=n, replace=TRUE)
+#' delta <- sample(c(0, 1), size=n, prob=c(0.2, 0.8), replace=TRUE)
 #' X <- round(rnorm(100, mean=36, sd=7), 0)
 #'
-#' mod <- survreg(Surv(time, delta) ~ X, dist="weibull")
-#' summary(presid(mod))
-#'
-#' #Example for coxph
-#' mod <- coxph(Surv(time, delta) ~ X)
-#' summary(presid(mod))
-#' ##################
-#'
+#' mod.coxph <- coxph(Surv(time, delta) ~ X)
+#' summary(presid(mod.coxph))
 #'
 #' #Example for negative binomial
 #' library(MASS)
@@ -136,8 +171,8 @@ presid.default <- function(object, ...) {
 #' phi <- 3
 #' y <- rnbinom(n, mu=exp(mu), size=phi)
 #'
-#' mod <- glm.nb(y ~ X)
-#' summary(presid(mod))
+#' mod.glm.nb <- glm.nb(y ~ X)
+#' summary(presid(mod.glm.nb))
 presid <- function(object, ...) {
     UseMethod('presid', object)
 }

@@ -14,7 +14,13 @@ presid(object, ...)
 The probability scale residual for the model
 }
 \description{
-\code{presid} Calculates the probability-scale residual for various model function objects.
+\code{presid} Calculates the probability-scale residual for various model
+function objects. Currently supported models include \code{\link{glm}}
+(Poisson, binomial, and gaussian families), \code{\link{lm}} in the
+\pkg{stats} library, \code{\link{survreg}} (Weibull, exponential, gaussian,
+logistic, and lognormal distributions) and \code{\link{coxph}} in the
+\pkg{survival} library, and \code{\link{polr}} and \code{\link{glm.nb}} in
+the \pkg{MASS} library.
 }
 \details{
 Probability-scale residual is \eqn{P(Y* < y) - P(Y* > y)} where \eqn{y} is the observed
@@ -25,18 +31,24 @@ library(survival)
 library(stats)
 
 set.seed(100)
-time <- sample(1:60, size=100, replace=TRUE)
-delta <- sample(c(0,1), size=100, prob=c(0.2,0.8), replace=TRUE)
-X <- round(rnorm(100, mean=36, sd=7), 0)
+n <- 1000
+x <- rnorm(n)
+t <- rweibull(n, shape=1/3, scale=exp(x))
+c <- rexp(n, 1/3)
+y <- pmin(t, c)
+d <- ifelse(t<=c, 1, 0)
 
-mod <- survreg(Surv(time, delta) ~ X, dist="weibull")
-summary(presid(mod))
+mod.survreg <- survreg(Surv(y, d) ~ x, dist="weibull")
+summary(presid(mod.survreg))
+plot(x, presid(mod.survreg))
 
 #Example for coxph
-mod <- coxph(Surv(time, delta) ~ X)
-summary(presid(mod))
-##################
+time <- sample(60, size=n, replace=TRUE)
+delta <- sample(c(0, 1), size=n, prob=c(0.2, 0.8), replace=TRUE)
+X <- round(rnorm(100, mean=36, sd=7), 0)
 
+mod.coxph <- coxph(Surv(time, delta) ~ X)
+summary(presid(mod.coxph))
 
 #Example for negative binomial
 library(MASS)
@@ -48,8 +60,8 @@ mu <- beta0 + beta1*X
 phi <- 3
 y <- rnbinom(n, mu=exp(mu), size=phi)
 
-mod <- glm.nb(y ~ X)
-summary(presid(mod))
+mod.glm.nb <- glm.nb(y ~ X)
+summary(presid(mod.glm.nb))
 }
 \author{
 Charles Dupont \email{charles.dupont@vanderbilt.edu}
