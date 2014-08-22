@@ -1,9 +1,9 @@
 #' cocobot class print method
+#' @method print cocobot
 #' @param x cocobot object
 #' @param ... arguments passed to print.default
 #' @keywords print
 #' @export
-#' @method print cocobot
 #' @author Charles Dupont
 print.cocobot <- function(x, ...) {
   y <- matrix(nrow=length(x$TS),ncol=5)

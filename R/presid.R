@@ -41,7 +41,7 @@ presid.polr <- function(object, ...) {
     cumpr <- cbind(0, matrix(pfun(matrix(object$zeta, n, q, byrow = TRUE) - object$lp),, q), 1)
     y <- as.integer(model.response(object$model))
     lo <- cumpr[cbind(seq_len(n), y)]
-    hi <- cumpr[cbind(seq_len(n), y+1L)] - 1
+    hi <- 1 - cumpr[cbind(seq_len(n), y+1L)]
     lo - hi
 }
 
@@ -51,7 +51,7 @@ presid.coxph <- function(object, ...) {
     time <- object$y[,1]
     delta <- object$y[,2]
     
-    1-exp(residuals(object)-delta)-delta*exp(residuals(object)-delta)
+    1 - exp(residuals(object) - delta) - delta*exp(residuals(object) - delta)
 }
 
 
@@ -153,26 +153,54 @@ presid.default <- function(object, ...) {
 #' summary(presid(mod.survreg))
 #' plot(x, presid(mod.survreg))
 #' 
-#' #Example for coxph
-#' time <- sample(60, size=n, replace=TRUE)
-#' delta <- sample(c(0, 1), size=n, prob=c(0.2, 0.8), replace=TRUE)
-#' X <- round(rnorm(100, mean=36, sd=7), 0)
+#' ##### example for proprotional hazards model
+#' n <- 1000
+#' x <- rnorm(n)
+#' beta0 <- 1
+#' beta1 <- 0.5
+#' t <- rexp(n, rate = exp(beta0 + beta1*x))
+#' c <- rexp(n, rate=1)
+#' y <- ifelse(t<c, t, c)
+#' delta <- as.integer(t<c)
+#' 
+#' mod.coxph <- coxph(Surv(y, delta) ~ x)
+#' presid <- presid(mod.coxph)
+#' plot(x, presid, cex=0.4, col=delta+2)
 #'
-#' mod.coxph <- coxph(Surv(time, delta) ~ X)
-#' summary(presid(mod.coxph))
-#'
-#' #Example for negative binomial
+#' #### example for Negative Binomial regression
 #' library(MASS)
-#' n <- 2000
-#' beta0 <- 0
-#' beta1 <- 1
-#' X <- rnorm(n)
-#' mu <- beta0 + beta1*X
-#' phi <- 3
-#' y <- rnbinom(n, mu=exp(mu), size=phi)
-#'
-#' mod.glm.nb <- glm.nb(y ~ X)
-#' summary(presid(mod.glm.nb))
+#' 
+#' n <- 1000
+#' beta0 <- 1
+#' beta1 <- 0.5
+#' x <- runif(n, min=-3, max=3)
+#' y <- rnbinom(n, mu=exp(beta0 + beta1*x), size=3)
+#' 
+#' mod.glm.nb <- glm.nb(y~x)
+#' presid <- presid(mod.glm.nb)
+#' summary(presid)
+#' plot(x, presid, cex=0.4)
+#' 
+#' ##### example for proportional odds model
+#' library(MASS)
+#' 
+#' n <- 1000
+#' x  <- rnorm(n)
+#' y  <- numeric(n)
+#' alpha = c(-1, 0, 1, 2)
+#' beta <- 1
+#' py  <-  (1 + exp(- outer(alpha, beta*x, "+"))) ^ (-1)
+#' aa = runif(n)
+#' for(i in 1:n)
+#'   y[i] = sum(aa[i] > py[,i])
+#' y <-  as.factor(y)
+#' 
+#' 
+#' mod.polr <- polr(y~x, method="logistic")
+#' summary(mod.polr)
+#' presid <- presid(mod.polr)
+#' summary(presid)
+#' plot(x, presid, cex=0.4)
 presid <- function(object, ...) {
     UseMethod('presid', object)
 }

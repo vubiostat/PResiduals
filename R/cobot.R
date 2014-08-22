@@ -359,6 +359,11 @@ ordinal.scores <- function(mf, mm, method) {
 #' \code{cobot} is called.
 #' @param subset an optional vector specifying a subset of
 #' observations to be used in the fitting process.
+#' @param na.action how \code{NA}s are treated.
+#' @param fisher  logical; if \code{TRUE}, Fisher transformation and delta method a
+#' used to compute p value for the test statistic based on correlation of
+#' residuals.
+#' @param conf.int numeric specifying confidence interval coverage.
 #' @return object of \samp{cobot} class.
 #' @references Li C and Shepherd BE, Test of association between two
 #' ordinal variables while adjusting for covariates. Journal of the
@@ -400,18 +405,18 @@ cobot <- function(formula, link=c("logit", "probit", "cloglog", "cauchit"),
   # NOTE: we add the opposite variable to each model frame call so that
   # subsetting occurs correctly. Later we strip them off.
   mx[["formula"]] <- Fx
-  yName <- all.vars(Fy[[2]])[1]
+  yName <- paste0('(', all.vars(Fy[[2]])[1], ')')
   mx[[yName]] <- Fy[[2]]
 
   my[["formula"]] <- Fy
-  xName <- all.vars(Fx[[2]])[1]
+  xName <- paste0('(', all.vars(Fx[[2]])[1], ')')
   my[[xName]] <- Fx[[2]]
 
   mx <- eval(mx, parent.frame())
-  mx[[paste('(',yName,')',sep='')]] <- NULL
+  mx[[paste0('(',yName,')')]] <- NULL
   
   my <- eval(my, parent.frame())
-  my[[paste('(',xName,')',sep='')]] <- NULL
+  my[[paste0('(',xName,')')]] <- NULL
 
   data.points <- nrow(mx)
 

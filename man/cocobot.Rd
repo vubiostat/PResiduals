@@ -27,11 +27,11 @@ containing the variables in the model.  If not found in
 \item{subset}{an optional vector specifying a subset of
 observations to be used in the fitting process.}
 
-\item{na.action}{action to take when NA present in data.}
+\item{na.action}{action to take when \code{NA} present in data.}
 
 \item{emp}{logical indicating whether the residuals from the model of
-\var{Y} on \var{Z} are computed based on the assumption of normality (FALSE)
-or empirically (FALSE).}
+\var{Y} on \var{Z} are computed based on the assumption of normality (\code{FALSE})
+or empirically (\code{TRUE}).}
 
 \item{fisher}{logical indicating whether to apply fisher transformation to compute confidence intervals and p-values for the correlation.}
 
@@ -60,17 +60,16 @@ This indicates that models of \code{\var{X} ~ \var{Z}} and
 tested is \eqn{H_0 : X}{H0 : X} independant of \var{Y} conditional
 on \var{Z}.  The ordinal variable, \code{\var{X}}, must precede the \code{|} and be a factor variable, and \code{\var{Y}} must be continuous.
 }
-\section{References}{
-
+\examples{
+data(PResidData)
+cocobot(y|w ~ z, data=PResidData)
+}
+\references{
 Li C and Shepherd BE (2012)
 A new residual for ordinal outcomes.
 \emph{Biometrika}. \bold{99}: 473--480.
 
 Shepherd BE, Li C, Liu Q (submitted)
 Probability-scale residuals for continuous, discrete, and censored data.
-}
-\examples{
-data(PResidData)
-cocobot(w|y~z, data=PResidData)
 }
 

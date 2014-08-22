@@ -32,6 +32,14 @@ containing the variables in the model.  If not found in
 
 \item{subset}{an optional vector specifying a subset of
 observations to be used in the fitting process.}
+
+\item{na.action}{how \code{NA}s are treated.}
+
+\item{fisher}{logical; if \code{TRUE}, Fisher transformation and delta method a
+used to compute p value for the test statistic based on correlation of
+residuals.}
+
+\item{conf.int}{numeric specifying confidence interval coverage.}
 }
 \value{
 object of \samp{cobot} class.

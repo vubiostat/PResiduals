@@ -156,12 +156,10 @@ corTS = function(xresid, yresid,
 #' tested is \eqn{H_0 : X}{H0 : X} independant of \var{Y} conditional
 #' on \var{Z}.  The ordinal variable, \code{\var{X}}, must precede the \code{|} and be a factor variable, and \code{\var{Y}} must be continuous.
 #'  
-#' @section References:
-#' Li C and Shepherd BE (2012) 
+#' @references Li C and Shepherd BE (2012) 
 #' A new residual for ordinal outcomes.
 #' \emph{Biometrika}. \bold{99}: 473--480.
-#' 
-#' Shepherd BE, Li C, Liu Q (submitted)
+#' @references Shepherd BE, Li C, Liu Q (submitted)
 #' Probability-scale residuals for continuous, discrete, and censored data.
 #'
 
@@ -184,11 +182,11 @@ corTS = function(xresid, yresid,
 #' @param subset an optional vector specifying a subset of
 #' observations to be used in the fitting process.
 #' 
-#' @param na.action action to take when NA present in data.
+#' @param na.action action to take when \code{NA} present in data.
 #' 
 #' @param emp logical indicating whether the residuals from the model of
-#' \var{Y} on \var{Z} are computed based on the assumption of normality (FALSE) 
-#' or empirically (FALSE).
+#' \var{Y} on \var{Z} are computed based on the assumption of normality (\code{FALSE}) 
+#' or empirically (\code{TRUE}).
 #' 
 #' @param fisher logical indicating whether to apply fisher transformation to compute confidence intervals and p-values for the correlation.
 #' 
@@ -198,7 +196,7 @@ corTS = function(xresid, yresid,
 #' @export
 #' @examples
 #' data(PResidData)
-#' cocobot(w|y~z, data=PResidData)
+#' cocobot(y|w ~ z, data=PResidData)
 #' @importFrom rms lrm
 #' @importFrom sandwich bread estfun
 

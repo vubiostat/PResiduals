@@ -21,12 +21,3 @@ print.cobot <- function(x, ...) {
   cat('Number of Observations:',x$data.points,'\n')
   invisible(y)
 }
-
-#' cocobot class print method
-#' @param x cocobot object
-#' @param ... arguments passed to print.default
-#' @keywords print
-#' @export
-#' @method print cocobot
-#' @author Charles Dupont
-print.cocobot <- print.cobot
