@@ -217,6 +217,10 @@ cocobot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit
   mf <- mf[c(1L, m)]
   mf$drop.unused.levels <- TRUE
   mf$na.action <- na.action
+  # We set xlev to a benign non-value in the call so that it won't get partially matched
+  # to any variable in the formula. For instance a variable named 'x' could possibly get
+  # bound to xlev, which is not what we want.
+  mf$xlev <- integer(0) 
   mf[[1L]] <- as.name("model.frame")
   
   
