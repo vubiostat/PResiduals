@@ -41,7 +41,7 @@ presid.polr <- function(object, ...) {
     cumpr <- cbind(0, matrix(pfun(matrix(object$zeta, n, q, byrow = TRUE) - object$lp),, q), 1)
     y <- as.integer(model.response(object$model))
     lo <- cumpr[cbind(seq_len(n), y)]
-    hi <- cumpr[cbind(seq_len(n), y+1L)] - 1
+    hi <- 1 - cumpr[cbind(seq_len(n), y+1L)]
     lo - hi
 }
 
