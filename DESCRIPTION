@@ -9,6 +9,7 @@ Description: Computes probability scale residuals and residual correlations
     for continuous, ordinal, binary, count, and time-to-event data (currently
     only implements ordinal data).
 Imports:
+    MASS,
     Formula,
     rms,
     sandwich,
@@ -25,6 +26,7 @@ Collate:
     'diagn.R'
     'cobot.R'
     'cocobot.R'
+    'countbot.R'
     'presid.R'
     'print.cobot.R'
     'print.cocobot.R'
