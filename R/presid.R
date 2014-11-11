@@ -106,6 +106,11 @@ presid.survreg <- function(object, ...){
 }
 
 #' @export
+presid.lrm <- function(object, ...) {
+    residuals(object, type="li.shepherd")
+}
+
+#' @export
 presid.default <- function(object, ...) {
     stop("Unhandled model type")
 }
