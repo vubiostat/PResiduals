@@ -158,6 +158,32 @@ nb.scores <- function(y, X, ...){
 ### formula x|y ~z, x is ordinal and y is continous
 ## family argument is added to specifies the family (poisson or negative binomial) for count data (new for countbot)
 ## emp argument is deleted compared with cocobot
+
+#' Function Description
+#'
+#' What the function does
+#'
+#' Details of function
+#'
+#' @param formula
+#' @param data
+#' @param link
+#' @param family
+#' @param subset an optional vector specifying a subset of
+#' observations to be used in the fitting process.
+#' 
+#' @param na.action action to take when \code{NA} present in data.
+#' 
+#' @param fisher logical indicating whether to apply fisher transformation to compute confidence intervals and p-values for the correlation.
+#' 
+#' @param conf.int numeric specifying confidence interval coverage.
+#' 
+#' @return object of \samp{countbot} class.
+#' @export
+#' @examples
+#' data(PResidData)
+#' cocobot(y|w ~ z, data=PResidData)
+
 countbot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit"),
                      family=c("poisson", "negative binomial"),
                      subset, na.action=getOption('na.action'), 
