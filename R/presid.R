@@ -50,10 +50,20 @@ presid.polr <- function(object, ...) {
 presid.coxph <- function(object, ...) {
     time <- object$y[,1]
     delta <- object$y[,2]
+    resid <- residuals(object, type="martingale")
     
-    1 - exp(residuals(object) - delta) - delta*exp(residuals(object) - delta)
+    1 - exp(resid - delta) - delta*exp(resid - delta)
 }
 
+###cph()
+#' @export
+presid.cph <- function(object, ...) {
+    time <- object$y[,1]
+    delta <- object$y[,2]
+    resid <- residuals(object, type="martingale")
+
+    1 - exp(resid - delta) - delta*exp(resid - delta)
+}
 
 ###survreg()
 #' @export
@@ -107,6 +117,11 @@ presid.survreg <- function(object, ...){
 
 #' @export
 presid.lrm <- function(object, ...) {
+    residuals(object, type="li.shepherd")
+}
+
+#' @export
+presid.orm <- function(object, ...) {
     residuals(object, type="li.shepherd")
 }
 
