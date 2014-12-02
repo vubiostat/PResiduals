@@ -32,7 +32,7 @@ poisson.scores <- function(y, X, ...){
 nb.scores <- function(y, X, ...){
   N <-  length(y)
   #mod <- glm.nb(y~X)
-  mod <- glm.nb(y~X,  ...)
+  mod <- MASS::glm.nb(y~X,  ...)
   #### score for beta's
   dl.dbeta <- (y - mod$fitted.values)/(1 + mod$fitted.values/mod$theta) * cbind(1, X)
   #### score for 1/size  (size = theta in glm.nb)
