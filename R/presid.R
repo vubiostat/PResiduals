@@ -34,6 +34,8 @@ presid.lm <- function(object, emp=FALSE, ...) {
 ###ols()
 #' @export
 presid.ols <- function(object, ...) {
+    if(is.null(object$y))
+        stop("Need Y=TRUE in fitting function call")
     y <- object$y
     sigma <- sqrt(sum(object$residuals^2)/object$df.residual)
     2 * pnorm((y - object$fitted.values)/sigma) - 1
