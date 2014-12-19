@@ -9,6 +9,16 @@ presid.glm <- function(object, emp=FALSE, ...) {
            stop("Unhandled family", object$family$family))
 }
 
+###Glm()
+#' @export
+presid.Glm <- function(object, emp=TRUE, ...) {
+     switch(object$family$family ,
+           poisson = 2 * ppois(object$y, object$fitted.values) - dpois(object$y, object$fitted.values) - 1,
+           binomial = object$y - object$fitted.values,
+           gaussian = if(emp) (2 * rank(residuals(object)) - 1 - length(object$y)) / length(object$y) else 2 * pnorm((object$y - object$fitted.values)/(sum(object$residuals)/sqrt(object$df.residual))) - 1,
+           stop("Unhandled family", object$family$family))   
+}
+
 ###lm()
 #' @export
 presid.lm <- function(object, emp=FALSE, ...) {
@@ -18,6 +28,15 @@ presid.lm <- function(object, emp=FALSE, ...) {
   } else {
       2 * pnorm((y - object$fitted.values)/summary(object)$sigma) - 1
   }
+}
+
+
+###ols()
+#' @export
+presid.ols <- function(object, ...) {
+    y <- object$y
+    sigma <- sqrt(sum(object$residuals^2)/object$df.residual)
+    2 * pnorm((y - object$fitted.values)/sigma) - 1
 }
 
 ###negative binomial
@@ -58,6 +77,9 @@ presid.coxph <- function(object, ...) {
 ###cph()
 #' @export
 presid.cph <- function(object, ...) {
+    if(is.null(object$y))
+        stop("X=TRUE must be set in fitting call")
+    
     time <- object$y[,1]
     delta <- object$y[,2]
     resid <- residuals(object, type="martingale")
@@ -113,6 +135,11 @@ presid.survreg <- function(object, ...){
                prob + delta*(prob - 1)
            },
            stop("Unhandled dist", object$dist))
+}
+
+###psm()
+#' @export
+presid.psm <- function(object, ...) {
 }
 
 #' @export
