@@ -24,7 +24,7 @@ presid.Glm <- function(object, emp=TRUE, ...) {
 presid.lm <- function(object, emp=FALSE, ...) {
     y <- model.response(object$model)
   if(emp) {
-      (2 * rank(residuals(object)) - 1 - length(y)) / length(y)
+      (2 * rank(residuals(object, type="working")) - 1 - length(y)) / length(y)
   } else {
       2 * pnorm((y - object$fitted.values)/summary(object)$sigma) - 1
   }
@@ -33,12 +33,16 @@ presid.lm <- function(object, emp=FALSE, ...) {
 
 ###ols()
 #' @export
-presid.ols <- function(object, ...) {
+presid.ols <- function(object, emp=FALSE, ...) {
     if(is.null(object$y))
         stop("Need Y=TRUE in fitting function call")
     y <- object$y
-    sigma <- sqrt(sum(object$residuals^2)/object$df.residual)
-    2 * pnorm((y - object$fitted.values)/sigma) - 1
+    if(emp) {
+	(2 * rank(residuals(object, type="ordinary")) - 1 - length(y)) / length(y)
+    } else {
+        sigma <- sqrt(sum(object$residuals^2)/object$df.residual)
+        2 * pnorm((y - object$fitted.values)/sigma) - 1
+   }
 }
 
 ###negative binomial
