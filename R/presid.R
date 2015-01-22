@@ -146,6 +146,51 @@ presid.survreg <- function(object, ...){
 ###psm()
 #' @export
 presid.psm <- function(object, ...) {
+    time <- object$y[,1]
+    delta <- object$y[,2]
+    
+    switch(object$dist,
+           weibull = {
+               prob <- pweibull(exp(time), shape=1/object$scale,
+                                scale=exp(object$linear.predictors),
+                                lower.tail=TRUE, log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
+           
+           exponential = {
+               prob <- pexp(time, rate=1/exp(object$linear.predictors),
+                            lower.tail=TRUE, log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
+           
+           gaussian = {
+               prob <- pnorm(time, mean=object$linear.predictors,
+                             sd=object$scale, lower.tail=TRUE,
+                             log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
+           
+           logistic = {
+               prob <- plogis(time, location=object$linear.predictors,
+                              scale=object$scale, lower.tail=TRUE,
+                              log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
+         
+           ## loglogistic = {
+           ##     prob <- pllogis(time, shape=summary(object)$scale,
+           ##                     scale=exp(object$linear.predictors),
+           ##                     lower.tail=TRUE, log.p=FALSE)
+           ##     prob + delta*(prob - 1)
+           ## },
+         
+           lognormal = {
+               prob <- plnorm(time, meanlog=object$linear.predictors,
+                              sdlog=object$scale, lower.tail=TRUE,
+                              log.p=FALSE)
+               prob + delta*(prob - 1)
+           },
+           stop("Unhandled dist", object$dist))
 }
 
 #' @export
