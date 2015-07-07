@@ -224,8 +224,14 @@ ordinal.scores.logit = function(y, X) {
     }
   }
 
+  low.x = cbind(0, Gamma)[cbind(1:N, y)]
+  hi.x = cbind(1-Gamma, 0)[cbind(1:N, y)]
+
+  presid <- low.x - hi.x
+  dpresid.dtheta <- dlow.dtheta - dhi.dtheta
 
   list(mod = mod,
+       presid=presid,
        dl.dtheta = dl.dtheta,
        d2l.dtheta.dtheta = d2l.dtheta.dtheta,
        var.theta = var.theta,
@@ -234,7 +240,8 @@ ordinal.scores.logit = function(y, X) {
        Gamma = Gamma,
        dgamma.dtheta = dgamma.dtheta,
        dlow.dtheta=dlow.dtheta,
-       dhi.dtheta=dhi.dtheta)
+       dhi.dtheta=dhi.dtheta,
+       dpresid.dtheta=dpresid.dtheta)
 }
 
 ordinal.scores <- function(mf, mm, method) {
@@ -299,7 +306,14 @@ ordinal.scores <- function(mf, mm, method) {
 
   d2l.dtheta.dtheta <- mod$Hessian
 
+  low.x = cbind(0, Gamma)[cbind(1:N, y)]
+  hi.x = cbind(1-Gamma, 0)[cbind(1:N, y)]
+
+  presid <- low.x - hi.x
+  dpresid.dtheta <- dlow.dtheta - dhi.dtheta
+
   list(mod = mod,
+       presid=presid,
        dl.dtheta = dl.dtheta,
        d2l.dtheta.dtheta = d2l.dtheta.dtheta,
        p0 = p0,
@@ -307,7 +321,8 @@ ordinal.scores <- function(mf, mm, method) {
        Gamma = Gamma,
        dcumpr=dcumpr,
        dlow.dtheta=dlow.dtheta,
-       dhi.dtheta=dhi.dtheta)
+       dhi.dtheta=dhi.dtheta,
+       dpresid.dtheta=dpresid.dtheta)
 }
 
 #' Conditional ordinal by ordinal tests for association.
@@ -321,7 +336,7 @@ ordinal.scores <- function(mf, mm, method) {
 #' distribution of \var{X} and \var{Y} with the joint fitted
 #' distribution of \var{X} and \var{Y} under independence conditional
 #' on \var{Z}. \code{T2} computes the correlation between ordinal
-#' (probability scale) residuals from both models and tests the null
+#' (probability-scale) residuals from both models and tests the null
 #' of no residual correlation.  \code{T3} evaluates the
 #' concordance--disconcordance of data drawn from the joint fitted
 #' distribution of \var{X} and \var{Y} under conditional independence
@@ -336,7 +351,7 @@ ordinal.scores <- function(mf, mm, method) {
 #' tested is \eqn{H_0 : X}{H0 : X} independant of \var{Y} conditional
 #' on \var{Z}.
 #' 
-#' Note that \code{T2} can be thought of as an adjust rank
+#' Note that \code{T2} can be thought of as an adjusted rank
 #' correlation.(\cite{Li C and Shepherd BE, A new residual for ordinal
 #' outcomes. Biometrika 2012; 99:473-480})
 #'
@@ -373,9 +388,6 @@ ordinal.scores <- function(mf, mm, method) {
 #' @import Formula
 #' @export
 #' @seealso \code{\link{Formula}}, \code{\link{as.data.frame}}
-#' @author Charles Dupont \email{charles.dupont@@vanderbilt.edu}
-#' @author Chun Li \email{chun.li@@vanderbilt.edu}
-#' @author Bryan Shepherd \email{bryan.shepherd@@vanderbilt.edu}
 #' @include newPolr.R
 #' @include diagn.R
 #' @include GKGamma.R

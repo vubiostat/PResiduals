@@ -1,174 +1,51 @@
-poisson.scores <- function(y, X, ...){
-  N <-  length(y)
-  mod <- glm(y~X, family=poisson(), ...)
-  #dl.dtheta <- estfun(mod)
-  dl.dtheta <- cbind(y- mod$fitted.value, (y- mod$fitted.value)*X)
-  #d2l.dtheta.dtheta <- -solve(bread(mod))*N
-  d2l.dtheta.dtheta <- - crossprod(cbind(1, X)*sqrt(mod$fitted))
-  
-  presid <- ppois(y-1, mod$fitted.values) + ppois(y, mod$fitted.values) -1
-  
-  #dpresid.dlambda <- 2*(ppois(y-2, mod$fitted.values) - ppois(y-1, mod$fitted.values)) + dpois(y-1, mod$fitted.values) - dpois(y, mod$fitted.values)
-  #### can be further simplified as
-  dpresid.dlambda <- -  (dpois(y-1, mod$fitted.values) + dpois(y, mod$fitted.values))
-  dlambda.dtheta <- mod$fitted.values * cbind(1, X)
-  dpresid.dtheta <- t(dpresid.dlambda * dlambda.dtheta)
-  
-  pearson.resid <- (y - mod$fitted.values)/sqrt(mod$fitted.values)
-  dpearson.resid.dlambda <- - 0.5 * ( mod$fitted.values^(-1/2) + mod$fitted.values^(-3/2)*y)
-  dpearson.resid.dtheta <- t(dpearson.resid.dlambda * dlambda.dtheta)
-  
-  list(mod = mod,
-       dl.dtheta = dl.dtheta,
-       d2l.dtheta.dtheta = d2l.dtheta.dtheta,
-       presid = presid,
-       dpresid.dtheta = dpresid.dtheta,
-       pearson.resid = pearson.resid,
-       dpearson.resid.dtheta = dpearson.resid.dtheta)
-}
-
-
-
-nb.scores <- function(y, X, ...){
-  N <-  length(y)
-  #mod <- glm.nb(y~X)
-  mod <- MASS::glm.nb(y~X,  ...)
-  #### score for beta's
-  dl.dbeta <- (y - mod$fitted.values)/(1 + mod$fitted.values/mod$theta) * cbind(1, X)
-  #### score for 1/size  (size = theta in glm.nb)
-  dl.dsize <- unlist(lapply(y, FUN=function(y) ifelse(y==0, 0, sum(1/(mod$theta + 0:(y-1)))))) - log( 1 + mod$fitted.values/mod$theta) + (mod$fitted.values - y)/(mod$theta + mod$fitted.values)
-  dl.dtheta <- cbind(dl.dbeta, dl.dsize)
-  
-  #### fisher information for beta's
-  d2l.dbeta.dbeta <- crossprod(cbind(1, X)*sqrt(mod$fitted.values/(1+mod$fitted.values/mod$theta)))
-  #### fisher information for theta
-  d2l.dsize.dsize <- sum( unlist(lapply(y, FUN=function(y) ifelse(y==0, 0, sum(1/(mod$theta + 0:(y-1))^2)))) - mod$fitted.values/mod$theta/(mod$fitted.values + mod$theta))
-  d2l.dtheta.dtheta <- rbind(cbind(d2l.dbeta.dbeta,0),0)
-  d2l.dtheta.dtheta[dim(d2l.dtheta.dtheta)[1] , dim(d2l.dtheta.dtheta)[2] ] <- d2l.dsize.dsize
-  presid <- pnbinom(y-1, mu=mod$fitted.values, size=mod$theta ) + pnbinom(y, mu=mod$fitted.values, size=mod$theta) -1
-  pearson.resid <- (y - mod$fitted.values)/sqrt(mod$fitted.values + mod$fitted.values^2/mod$theta)
-  dmu.dbeta <- mod$fitted.values * cbind(1, X)
-  dpresid.dmu <- dnbinom(y-1, size=mod$theta, mu=mod$fitted.values)/(mod$fitted.value + mod$theta) - (dnbinom(y-1, size=mod$theta, mu=mod$fitted.values) + dnbinom(y, size=mod$theta, mu=mod$fitted.values))*(mod$theta + y)/(mod$theta + mod$fitted.values)
-  dpresid.dbeta <- t(dpresid.dmu * dmu.dbeta)
-  df.dsize <- function(k, mu, size) {
-    dnbinom(k, size=size, mu=mu)*((mu-k)/(mu+size) +
-                                     log(size) -log(mu+size) +
-                                     unlist(lapply(k, FUN=function(k) ifelse(k==0, 0, sum(1/(size + (0:(k-1))))))) )                                  
-  }
-  
-  ### dpresid.dsize = 2 dF(y-1).dsize + df(y).dsize = 2 sum(df(y-1).dsize) + df(y).dsize
-  #tmp <-  cbind(y, mod$fitted.values)
-  #tmp2 <- apply(tmp, 1, FUN=function(x) ifelse(x[1]==0, 0, 2*sum(df.dsize(k=0:(x[1]-1), mu=x[2], size=mod$theta))))
- 
-  dpresid.dsize <- df.dsize(y, mod$fitted, mod$theta)  +
-    apply(cbind(y, mod$fitted.values), 1, FUN=function(x) ifelse(x[1]==0, 0, 2*sum(df.dsize(k=0:(x[1]-1), mu=x[2], size=mod$theta))))
-  dpresid.dtheta <- rbind(dpresid.dbeta, dpresid.dsize)
-  
-  dpearson.resid.dmu <- -0.5 * (y * (mod$fitted.values + mod$fitted.values^2/mod$theta)^(-3/2)*(1+2*mod$fitted.values/mod$theta) +
-                                  (1/mod$fitted.values + 1/mod$theta)^(-3/2)/mod$fitted.values^2)
-  dpearson.resid.dbeta <- t(dpearson.resid.dmu * dmu.dbeta)
-  dpearson.resid.dsize <- 0.5*(y-mod$fitted.values)*(mod$fitted.values + mod$fitted.values^2/mod$theta)^(-3/2)*mod$fitted.values^2/mod$theta^2
-  dpearson.resid.dtheta <- rbind(dpearson.resid.dbeta, dpearson.resid.dsize)
-  list(mod = mod,
-       dl.dtheta = dl.dtheta,
-       d2l.dtheta.dtheta = d2l.dtheta.dtheta,
-       presid = presid,
-       dpresid.dtheta = dpresid.dtheta,
-       pearson.resid = pearson.resid,
-       dpearson.resid.dtheta = dpearson.resid.dtheta)
-  
-
-}
-
-##### same function as in cocobot
-#corTS = function(xresid, yresid,
-#                 xz.dl.dtheta, yz.dl.dtheta,
-#                 xz.d2l.dtheta.dtheta, yz.d2l.dtheta.dtheta,
-#                 dxresid.dthetax, dyresid.dthetay,fisher=FALSE){
-#  
-#  TS = cor(xresid, yresid)
-#  
-#  xresid2 = xresid^2
-#  yresid2 = yresid^2
-#  xbyyresid = xresid * yresid
-#  mean.xresid = mean(xresid)
-#  mean.yresid = mean(yresid)
-#  mean.xbyyresid = mean(xbyyresid)
-#  
-#  bigphi = cbind(xz.dl.dtheta,
-#                 yz.dl.dtheta,
-#                 mean.xresid - xresid,
-#                 mean.yresid - yresid,
-#                 mean.xbyyresid - xbyyresid,
-#                 mean(xresid2)-xresid2,
-#                 mean(yresid2)-yresid2,
-#                 0)
-#  
-#  npar.xz = dim(xz.dl.dtheta)[2]
-#  npar.yz = dim(yz.dl.dtheta)[2]
-#  Ntheta = npar.xz + npar.yz + 6
-#  N = dim(xz.dl.dtheta)[1]
-#  
-#  A = matrix(0,Ntheta,Ntheta)
-#  A[1:npar.xz, 1:npar.xz] = xz.d2l.dtheta.dtheta
-#  A[npar.xz+(1:npar.yz), npar.xz+(1:npar.yz)] = yz.d2l.dtheta.dtheta
-#  A[Ntheta-6+(1:6), Ntheta-6+(1:6)] = diag(N, 6)
-#  
-#  bigpartial = rbind(c(dxresid.dthetax %*% rep(1, N), rep(0, npar.yz)),
-#                     c(rep(0, npar.xz), dyresid.dthetay %*% rep(1, N)),
-#                     c(dxresid.dthetax %*% yresid, dyresid.dthetay %*% xresid),
-#                     c(dxresid.dthetax %*% (2*xresid), rep(0, npar.yz)),
-#                     c(rep(0, npar.xz), dyresid.dthetay %*% (2*yresid)))
-#  
-#  A[Ntheta-6+(1:5), 1:(npar.xz+npar.yz)] = -bigpartial
-#  
-#  ## TS also equals numTS / sqrt(varprod) = numTS * revsvp
-#  numTS = mean.xbyyresid - mean.xresid * mean.yresid
-#  var.xresid = mean(xresid2) - mean.xresid^2
-#  var.yresid = mean(yresid2) - mean.yresid^2
-#  varprod = var.xresid * var.yresid
-#  revsvp = 1/sqrt(varprod)
-#  dTS.dvarprod = numTS * (-0.5) * revsvp^3
-#  
-#  smallpartial = N *
-#    c(-mean.yresid * revsvp + dTS.dvarprod * (-2*mean.xresid*var.yresid),
-#      -mean.xresid * revsvp + dTS.dvarprod * (-2*mean.yresid*var.xresid),
-#      revsvp,
-#      dTS.dvarprod * var.yresid,
-#      dTS.dvarprod * var.xresid)
-#  A[Ntheta, Ntheta-6+(1:5)] = -smallpartial
-#  
-#  A[Ntheta, Ntheta-6+(1:5)] = -smallpartial
-#  
-#  SS = solve(A, t(bigphi))
-#  var.theta = tcrossprod (SS, SS)
-#  varTS = var.theta[Ntheta, Ntheta]
-#  pvalTS = 2 * pnorm( -abs(TS)/sqrt(varTS))
-#  
-#  if (fisher==TRUE){
-#    ####Fisher's transformation
-#    TS_f <- log( (1+TS)/(1-TS) )
-#    var.TS_f <- varTS*(2/(1-TS^2))^2
-#    pvalTS <- 2 * pnorm( -abs(TS_f)/sqrt(var.TS_f))
-#  }
-#  
-#  list(TS=TS,var.TS=varTS, pval.TS=pvalTS)
-#}
-
-### formula x|y ~z, x is ordinal and y is continous
-## family argument is added to specifies the family (poisson or negative binomial) for count data (new for countbot)
-## emp argument is deleted compared with cocobot
-
-#' Function Description
+#' Conditional count by ordinal tests for association.
 #'
-#' What the function does
+#' \code{countbot} tests for independence between an ordered categorical
+#' variable, \var{X}, and a count variable, \var{Y}, conditional on other variables,
+#' \var{Z}.  The basic approach involves fitting an ordinal model of \var{X} on
+#' \var{Z}, a Poisson or Negative Binomial model of \var{Y} on \var{Z}, and then determining whether there is any
+#' residual information between \var{X} and \var{Y}.  This is done by
+#' computing residuals for both models, calculating their correlation, and 
+#' testing the null of no residual correlation.  This procedure is analogous to test statistic 
+#' \code{T2} in \code{cobot}.  Two test statistics (correlations) are currently output.  The first
+#' is the correlation between probability-scale residuals. The second is the correlation between 
+#' the Pearson residual for the count outcome model and a latent variable residual
+#' for the ordinal model.
+
 #'
-#' Details of function
+#' Formula is specified as \code{\var{X} | \var{Y} ~ \var{Z}}.
+#' This indicates that models of \code{\var{X} ~ \var{Z}} and
+#' \code{\var{Y} ~ \var{Z}} will be fit.  The null hypothesis to be
+#' tested is \eqn{H_0 : X}{H0 : X} independent of \var{Y} conditional
+#' on \var{Z}.  The ordinal variable, \code{\var{X}}, must precede the \code{|} and be a factor variable, and \code{\var{Y}} must be an integer.
+#' @references Li C and Shepherd BE (2012) 
+#' A new residual for ordinal outcomes.
+#' \emph{Biometrika}. \bold{99}: 473--480.
+#' @references Shepherd BE, Li C, Liu Q (submitted)
+#' Probability-scale residuals for continuous, discrete, and censored data.
 #'
-#' @param formula
-#' @param data
-#' @param link
-#' @param family
+
+#'
+#' @param formula an object of class \code{\link{Formula}} (or one
+#' that can be coerced to that class): a symbolic description of the
+#' model to be fitted.  The details of model specification are given
+#' under \sQuote{Details}.
+#'
+#' @param data an optional data frame, list or environment (or object
+#' coercible by \code{\link{as.data.frame}} to a data frame)
+#' containing the variables in the model.  If not found in
+#' \code{data}, the variables are taken from
+#' \code{environment(formula)}, typically the environment from which
+#' \code{countbot} is called.
+
+#' @param link.x The link family to be used for the ordinal model of 
+#' \var{X} on \var{Z}.  Defaults to \samp{logit}. Other options are
+#' \samp{probit}, \samp{cloglog}, and \samp{cauchit}.
+#' 
+#' @param family.y The error distribution for the count model of \var{Y} on \var{Z}.
+#' Defaults to \samp{poisson}. The other option is \samp{negative binomial}. 
+#' If \samp{negative binomial} is specified, \code{\link[MASS]{glm.nb}} is called to fit the count model.
+
 #' @param subset an optional vector specifying a subset of
 #' observations to be used in the fitting process.
 #' 
@@ -178,14 +55,47 @@ nb.scores <- function(y, X, ...){
 #' 
 #' @param conf.int numeric specifying confidence interval coverage.
 #' 
-#' @return object of \samp{countbot} class.
+#' @return object of \samp{cocobot} class.
 #' @export
 #' @examples
-#' data(PResidData)
-#' cocobot(y|w ~ z, data=PResidData)
+#'
+#' generate.data3 = function(alphax, betax, alphay, betay, eta, N) {
+#'   z = rnorm(N,0,1)
+#'   x = v = numeric(N)
+#'  
+#'   ## px is an N x length(alphax) matrix.
+#'   ## Each row has the TRUE cummulative probabilities for each subject.
+#'   px = (1 + exp(- outer(alphax, betax*z, "+"))) ^ (-1)
+#'   aa = runif(N)
+#'   for(i in 1:N)
+#'     x[i] = sum(aa[i] > px[,i])
+#'   x = as.numeric(as.factor(x))
+#'   v = rpois(N, exp(outer(alphay, betay*z+eta[x], "+")))
+#'  
+#'   return(list(x=as.factor(x), v=v, z=z))
+#' }
+#'
+#' set.seed(13)
+#' alphax = c(-1, 0, 1, 2)
+#' betax = 1
+#' alphay = 1
+#' betay = -.5
+#'
+#' #eta = rep(0, 5)
+#' eta = c(1:5)/5
+#' N = 100
+#'
+#' data <- generate.data3(alphax, betax, alphay, betay, eta, N)
+#' ### 
+#' countbot(x|v~z, data=data, link.x="logit", family.y="poisson")
+#' countbot(x|v~z, data=data, link.x="probit", family.y="negative binomial")
 
-countbot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchit"),
-                     family=c("poisson", "negative binomial"),
+
+
+
+
+countbot <- function(formula, data, link.x=c("logit", "probit", "cloglog", "cauchit"),
+                     family.y=c("poisson", "negative binomial"),
                      subset, na.action=getOption('na.action'), 
                      fisher=FALSE, conf.int=0.95) {
   
@@ -250,12 +160,12 @@ countbot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchi
     myz <- myz[, -zzint, drop = FALSE]
   }
   
-  score.xz <- ordinal.scores(mx, mxz,method=link)
-  if (family[1]=="poisson")
+  score.xz <- ordinal.scores(mx, mxz,method=link.x[1])
+  if (family.y[1]=="poisson")
     score.yz <- poisson.scores(y=model.response(my), X=myz)
-  else if (family[1]=="negative binomial")
+  else if (family.y[1]=="negative binomial")
     score.yz <- nb.scores(y=model.response(my), X=myz)
-  else stop("family has to be 'poisson' or 'negative binomial'")
+  else stop("family.y has to be 'poisson' or 'negative binomial'")
   
   npar.xz = dim(score.xz$dl.dtheta)[2]
   npar.yz = dim(score.yz$dl.dtheta)[2]
@@ -282,19 +192,20 @@ countbot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchi
              score.xz$dl.dtheta, score.yz$dl.dtheta,
              score.xz$d2l.dtheta.dtheta, score.yz$d2l.dtheta.dtheta,
              xz.dpresid.dtheta, score.yz$dpresid.dtheta,fisher)
-  tb.label = "PResid vs. PResid (assume normality)" 
+  tb.label = "PResid vs. PResid" 
   
   ans$TS$TB <- 
     list( 
       ts=tb$TS, var=tb$var.TS, pval=tb$pval.TS,
       label = tb.label
     )
-  
+
+  T3 <- 3 * sum(xz.presid * score.yz$presid) / N
   rij <- cbind(score.xz$Gamma, 1)[cbind(1:N, xx)]
   rij_1 <- cbind(0,score.xz$Gamma)[cbind(1:N, xx)]
   pij <- rij-rij_1
   
-  G.inverse <- switch(link[1], logit = qlogis, probit = qnorm,
+  G.inverse <- switch(link.x[1], logit = qlogis, probit = qnorm,
                       cloglog = qgumbel, cauchit = qcauchy)
   xz.latent.resid <- rep(NA, N)
   
@@ -302,7 +213,7 @@ countbot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchi
   for (i in 1:N){
     tmp <- try(integrate(G.inverse, rij_1[i], rij[i])$value/pij[i],silent=TRUE)
     if (inherits(tmp,'try-error')){
-      if (link[1] != 'cauchit')
+      if (link.x[1] != 'cauchit')
         warning("Cannot compute latent variable residual.")
       else
         warning("Cannot compute latent variable residual with link function cauchit.")
@@ -354,43 +265,44 @@ countbot <- function(formula, data, link=c("logit", "probit", "cloglog", "cauchi
     ans$TS[[i]]$lower <- ts_ci[1]
     ans$TS[[i]]$upper <- ts_ci[2]
   }
-  
-  ans
+
+  print(T3)
+  return(ans)
   
 }
 
 
 #### example
 ## generate count by ordinal data
-generate.data3 = function(alphax, betax, alphay, betay, eta, N) {
-  z = rnorm(N,0,1)
-  x = y = numeric(N)
+## generate.data3 = function(alphax, betax, alphay, betay, eta, N) {
+##   z = rnorm(N,0,1)
+##   x = y = numeric(N)
   
-  ## px is an N x length(alphax) matrix.
-  ## Each row has the TRUE cummulative probabilities for  each subject.
-  px = (1 + exp(- outer(alphax, betax*z, "+"))) ^ (-1)
-  aa = runif(N)
-  for(i in 1:N)
-    x[i] = sum(aa[i] > px[,i])
-  x = as.numeric(as.factor(x))
-  y = rpois(N, exp(outer(alphay, betay*z+eta[x], "+")))
+##   ## px is an N x length(alphax) matrix.
+##   ## Each row has the TRUE cummulative probabilities for  each subject.
+##   px = (1 + exp(- outer(alphax, betax*z, "+"))) ^ (-1)
+##   aa = runif(N)
+##   for(i in 1:N)
+##     x[i] = sum(aa[i] > px[,i])
+##   x = as.numeric(as.factor(x))
+##   y = rpois(N, exp(outer(alphay, betay*z+eta[x], "+")))
   
-  return(list(x=as.factor(x), y=y, z=z))
-}
+##   return(list(x=as.factor(x), y=y, z=z))
+## }
 
 
-set.seed(13)
-alphax = c(-1, 0, 1, 2)
-betax = 1
-alphay = 1
-betay = -.5
+## set.seed(13)
+## alphax = c(-1, 0, 1, 2)
+## betax = 1
+## alphay = 1
+## betay = -.5
 
-#eta = rep(0, 5)
-eta = c(1:5)/20 
-N = 200
-data <- generate.data3(alphax, betax, alphay, betay, eta, N)
+## #eta = rep(0, 5)
+## eta = c(1:5)/20 
+## N = 200
+## data <- generate.data3(alphax, betax, alphay, betay, eta, N)
 
-#### check for cocobot
-cocobot(x|y~z, data=data)
-countbot(x|y~z, data=data, fisher=TRUE)
-countbot(x|y~z, data=data, family="negative binomial")
+## #### check for cocobot
+## cocobot(x|y~z, data=data)
+## countbot(x|y~z, data=data, fisher=TRUE)
+## countbot(x|y~z, data=data, family="negative binomial")
